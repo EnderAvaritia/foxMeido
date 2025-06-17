@@ -9,6 +9,6 @@ requires-python = ">=3.9, <4.0"
 adapters = [
     { name = "QQ", module_name = "nonebot.adapters.qq" }
 ]
-plugins = []
+plugins = ["nonebot_plugin_alconna", "nonebot_plugin_apscheduler"]
 plugin_dirs = ["plugins"]
-builtin_plugins = ["echo", "single_session"]
+builtin_plugins = ["echo"]

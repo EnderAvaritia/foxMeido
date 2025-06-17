@@ -14,4 +14,8 @@ See [Docs](https://nonebot.dev/)
 
 Linux:`source .venv\Scripts\activate`/ Windows:`.venv\Scripts\activate.bat`
 
-`pip install reqable beautifulsoup4 playwright`
+`nb plugin install nonebot-plugin-alconna`
+
+`nb plugin install nonebot_plugin_apscheduler`
+
+`pip install requests beautifulsoup4 playwright httpx lxml`
