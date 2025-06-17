@@ -55,7 +55,6 @@ async def send_message(name: str):
         print("no_match")
         await steam_searcher.send("oh!NO!")
 
-
 async def get_message(name):
     headers = {
         'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:138.0) Gecko/20100101 Firefox/138.0",
@@ -73,10 +72,8 @@ async def get_message(name):
     }
     #添加cookies
     
-    proxy = {
-        "http://": "http://127.0.0.1:7890",
-        "https://": "http://127.0.0.1:7890"
-    }
+    proxy_url = "http://localhost:7890"
+
     url = (
         "https://store.steampowered.com/search/?term="
         + name
@@ -84,7 +81,7 @@ async def get_message(name):
     )
     print(url)
 
-    async with httpx.AsyncClient(proxies=proxy) as client:
+    async with httpx.AsyncClient(proxy=proxy_url) as client:
         response = await client.get(url, headers=headers)
         if response.status_code != 200:
             print("请求失败")
