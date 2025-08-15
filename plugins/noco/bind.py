@@ -49,7 +49,7 @@ def createRecord (url, userId, steamid):
     response = requests.post(url, data=json.dumps(payload), headers=headers)
     # response = requests.post(url, data=json.dumps(payload), headers=headers, verify=False)
 
-    print(response.text)
+    # print(response.text)
     
     json_string = response.text
     data = json.loads(json_string)
@@ -71,7 +71,7 @@ def updateRecord (url, userId, steamid, recordId):
     response = requests.patch(url, data=json.dumps(payload), headers=headers)
     # response = requests.patch(url, data=json.dumps(payload), headers=headers, verify=False)
 
-    print(response.text)
+    # print(response.text)
     
     json_string = response.text
     data = json.loads(json_string)
@@ -91,17 +91,17 @@ async def handle_function(event):
     record = getRecord(url)
     # 获取是否存在已有的记录,返回是是一个包含id的数组
     
-    print(record)
+    # print(record)
 
     message_text = str(event.get_message())
     # https://steamcommunity.com/profiles/76561198836530221/
     steamid = re.findall(r"(?<=steamcommunity.com/profiles/)(\d+)|(\d{15,20})", message_text)
     # 获取steamid
     
-    print(steamid)
+    # print(steamid)
     steamid = tuple(item for item in steamid[0] if item)[0]
     # 清除元组中的空结果
-    print(steamid)
+    # print(steamid)
     
     if not steamid: 
     # 如果没有找到有效的steamid，提前结束
