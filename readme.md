@@ -33,3 +33,9 @@ Linux:`source .venv\Scripts\activate`/ Windows:`.venv\Scripts\activate.bat`
 `nb plugin install nonebot_plugin_apscheduler`
 
 `pip install requests beautifulsoup4 playwright httpx lxml`
+
+## 需要配合其他软件使用的功能
+
+### 需要配合[nocodb](https://github.com/nocodb/nocodb)使用（wip）
+
+用于方便登记谁领了什么游戏

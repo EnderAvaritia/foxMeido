@@ -11,4 +11,8 @@ adapters = [
 ]
 plugins = ["nonebot_plugin_alconna", "nonebot_plugin_apscheduler"]
 plugin_dirs = ["plugins"]
+
+# plugin_dirs = ["plugins", "plugins/noco"]
+# 附加内容
+
 builtin_plugins = ["echo"]
