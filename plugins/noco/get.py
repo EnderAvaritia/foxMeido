@@ -67,11 +67,13 @@ def createRecord (url, gameId, gameName, userId, userName, steamid, link, dayTim
     
     return data
 
-def updateRecord (url, recordId, getedCount):
+def updateRecord (url, recordId, gameName, getedCount, canBeClaimed):
     
     payload = {
     "id": recordId,
-    "getedCount": getedCount
+    "gameName": gameName,
+    "getedCount": getedCount,
+    "canBeClaimed": canBeClaimed
     }
     headers = {
     'Content-Type': "application/json",
@@ -201,7 +203,7 @@ async def handle_function(event):
 
     dayTime = datetime.date.today().strftime('%Y-%m-%d')
 
-    link = f'https://steamcommunity.com/profiles/{accountRecord["steamId"]}/recommended/{goodId}/'
+    link = f'https://steamcommunity.com/profiles/{accountRecord["steamId"]}/recommended/{goodId}'
     
     recordTableUrl = f"{nocoUrl}/{recordTableId}/records"
     
@@ -211,6 +213,7 @@ async def handle_function(event):
         await get.finish(f"登记阶段出现未知错误，请反馈")
     else:
         remainTableUrl = f"{nocoUrl}/{remainTableId}/records"
-        remain = updateRecord (remainTableUrl, remainGameRecord["id"], remainGameRecord["getedCount"] + 1)
+        canBeClaimed = bool(remainGameRecord["totalCount"] - remainGameRecord["getedCount"] - 1)
+        remain = updateRecord (remainTableUrl, remainGameRecord["id"], gameInfo["game_name"], remainGameRecord["getedCount"] + 1, canBeClaimed)
         if "id" in remain :
             await get.finish(f'id为{userId}的用户{nickname}\n对id为{goodId}的游戏《{gameInfo["game_name"]}》\n成功登记为第{recordResult["id"]}个结果\n游戏剩余{remainGameRecord["totalCount"] - remainGameRecord["getedCount"] - 1}个')
