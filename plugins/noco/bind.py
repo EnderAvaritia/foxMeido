@@ -102,19 +102,19 @@ async def handle_function(event):
     steamid = re.findall(r"(?<=steamcommunity.com/profiles/)(\d+)|(\d{15,20})", message_text)
     # 获取steamid
     
+    if not steamid: 
+    # 如果没有找到有效的steamid，提前结束
+        await bind.finish("未检测到有效的Steam ID，请检查输入。")
+    
     # print(steamid)
     steamid = tuple(item for item in steamid[0] if item)[0]
     # 清除元组中的空结果
     # print(steamid)
     
-    if not steamid: 
-    # 如果没有找到有效的steamid，提前结束
-        await bind.finish("未检测到有效的Steam ID，请检查输入。")
-    
     # await bind.send(f"{userId}:{steamid}")
     
     url = f"{nocoUrl}/{tableId}/records"
-    if record == "":
+    if "id" not in record:
         recordId = createRecord(url, userId, steamid, nickname)
         await bind.finish(f"{nickname}用户的id：{userId}\n{steamid}\n已被登记为第{recordId}个结果")
     else:
