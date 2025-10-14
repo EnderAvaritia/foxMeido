@@ -1,5 +1,5 @@
 CREATE TABLE account (
-    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    id INTEGER PRIMARY KEY ,
     created_at DATETIME,
     updated_at DATETIME,
     created_by VARCHAR(255),
@@ -10,7 +10,7 @@ CREATE TABLE account (
     nickname VARCHAR(255)
 );
 CREATE TABLE records (
-    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    id INTEGER PRIMARY KEY ,
     created_at DATETIME,
     updated_at DATETIME,
     created_by VARCHAR(255),
@@ -28,7 +28,7 @@ CREATE TABLE records (
     steamId INTEGER
 );
 CREATE TABLE remain (
-    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    id INTEGER PRIMARY KEY ,
     created_at DATETIME,
     updated_at DATETIME,
     created_by VARCHAR(255),
@@ -41,7 +41,7 @@ CREATE TABLE remain (
     canBeClaimed_1 VARCHAR(255)
 );
 CREATE TABLE wishlist (
-    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    id INTEGER PRIMARY KEY ,
     created_at DATETIME,
     updated_at DATETIME,
     created_by VARCHAR(255),
@@ -54,5 +54,6 @@ CREATE TABLE wishlist (
     Link VARCHAR(255),
     submitTime VARCHAR(255),
     publisher VARCHAR(255),
+    releaseDate VARCHAR(255),
     steamId INTEGER
 );

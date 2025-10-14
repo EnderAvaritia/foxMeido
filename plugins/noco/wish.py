@@ -39,7 +39,7 @@ def getRecord(url):
         # return data['list'][0]['steamId']
         return data['list'][0] # 这东西还得要求一个id用于更新记录
         
-def createRecord (url, gameId, gameName, userId, userName, steamid, link, dayTime, publisher):
+def createRecord (url, gameId, gameName, userId, userName, steamid, link, dayTime, publisher, releaseDate):
     payload = {
     "gameId": gameId,
     "gameName": gameName,
@@ -48,7 +48,8 @@ def createRecord (url, gameId, gameName, userId, userName, steamid, link, dayTim
     "steamId": steamid,
     "Link": link,
     "submitTime": dayTime,
-    "publisher": publisher
+    "publisher": publisher,
+    "releaseDate": releaseDate
     }
     
     headers = {
@@ -82,6 +83,7 @@ def getGameInfo(appid: int):
     """
     game_name = None
     publisher = None # 默认为None
+    release_date = None
     errors = []
 
     # --- 通过Steam Web API 获取游戏名称和厂商名 ---
@@ -115,6 +117,14 @@ def getGameInfo(appid: int):
                 else:
                     errors.append(f"API返回的厂商列表为空或未找到 (AppID: {appid})")
                     print(errors[-1])
+                    
+                # 获取发行日期并合并
+                release_date = details.get('release_date').get('date')
+                if release_date:
+                    print(f"获取到发行日期: {release_date}")
+                else:
+                    errors.append(f"API返回的发行日期为空或未找到 (AppID: {appid})")
+                    print(errors[-1])
             else:
                 errors.append(f"API返回数据中未找到'data'详情 (AppID: {appid})")
                 print(errors[-1])
@@ -134,7 +144,8 @@ def getGameInfo(appid: int):
 
     result = {
         "game_name": game_name,
-        "publisher": publisher
+        "publisher": publisher,
+        "release_date":release_date
     }
     if errors:
         result["error"] = "; ".join(errors)
@@ -180,9 +191,9 @@ async def handle_function(event):
         
         wishlistTableUrl = f"{nocoUrl}/{wishlistTableId}/records"
     
-        recordResult = createRecord (wishlistTableUrl, goodId, gameInfo["game_name"], accountRecord["account"], accountRecord["nickname"], accountRecord["steamId"], link, dayTime, gameInfo["publisher"])
+        recordResult = createRecord (wishlistTableUrl, goodId, gameInfo["game_name"], accountRecord["account"], accountRecord["nickname"], accountRecord["steamId"], link, dayTime, gameInfo["publisher"],gameInfo["release_date"])
 
         if "id" not in recordResult:
             await wish.finish(f"登记阶段出现未知错误，请反馈")
         else:
-             await wish.finish(f'id为{userId}的用户{nickname}\n对id为{goodId}的游戏《{gameInfo["game_name"]}》\n成功登记为第{recordResult["id"]}个许愿')
+             await wish.finish(f'id为{userId}的用户{nickname}\n对id为{goodId}的游戏《{gameInfo["game_name"]}》\n成功登记为第{recordResult["id"]}个许愿\n预计发行日期为：{gameInfo["release_date"]}')
