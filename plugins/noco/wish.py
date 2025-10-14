@@ -176,7 +176,7 @@ async def handle_function(event):
 
         dayTime = datetime.date.today().strftime('%Y-%m-%d')
 
-        link = f'https://steamcommunity.com/profiles/{accountRecord["steamId"]}/recommended/{goodId}'
+        link = f'https://steamcommunity.com/profiles/{accountRecord["steamId"]}'
         
         wishlistTableUrl = f"{nocoUrl}/{wishlistTableId}/records"
     
