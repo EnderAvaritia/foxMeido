@@ -86,6 +86,7 @@ async def handle_function(event):
     
     userId = event.user_id
     # userId = event.author.id
+    userId = str(userId)
     
     nickname = event.sender.nickname
     
