@@ -81,7 +81,7 @@ async def get_message(goodId):
     pic_data = await take_screenshot(appid)
     if pic_data:
         pic = MessageSegment.image(pic_data)
-        return f'游戏名：{gameInfo["game_name"]}\n 支持语言：{gameInfo["supported_languages"]}\n 发售日期：{gameInfo["release_date"]}\n 发行商：{gameInfo["publisher"]}\n Steam商店页链接：https://store.steampowered.com/app/{appid}' + pic        
+        return f'游戏名：{gameInfo["game_name"]}\n支持语言：{gameInfo["supported_languages"]}\n发售日期：{gameInfo["release_date"]}\n发行商：{gameInfo["publisher"]}\nSteam商店页链接：https://store.steampowered.com/app/{appid}' + pic        
 
 # async def fetch_title(url: str) -> str:
     # proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
