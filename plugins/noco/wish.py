@@ -89,9 +89,11 @@ def getGameInfo(appid: int):
     # --- 通过Steam Web API 获取游戏名称和厂商名 ---
     api_url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=schinese"
     print(f"正在请求API接口: {api_url}")
+    proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
+
 
     try:
-        response = requests.get(api_url, timeout=10)
+        response = requests.get(api_url, proxies=proxies)
         response.raise_for_status()  # 检查HTTP状态码，如果不是200则抛出异常
 
         data = response.json()
