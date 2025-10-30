@@ -105,7 +105,7 @@ async def handle_function(event):
     
     if not steamid: 
     # 如果没有找到有效的steamid，提前结束
-        await bind.finish("未检测到有效的Steam ID，请检查输入。")
+        await bind.finish("未检测到有效的Steam ID，需要的是那个16位左右的那个。")
     
     # print(steamid)
     steamid = tuple(item for item in steamid[0] if item)[0]
