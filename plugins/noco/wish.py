@@ -67,6 +67,29 @@ def createRecord (url, gameId, gameName, userId, userName, steamid, link, dayTim
     
     return data
     
+def updateRecord (url, gameId, gameName, releaseDate, recordId):
+    payload = {
+    "id": recordId,
+    "gameId": gameId,
+    "gameName": gameName,
+    "releaseDate": releaseDate
+    }
+    
+    headers = {
+    'Content-Type': "application/json",
+    'xc-token': token
+    }
+    
+    # response = requests.post(url, data=json.dumps(payload), headers=headers)
+    response = requests.patch(url, data=json.dumps(payload), headers=headers, verify=False)
+
+    # print(response.text)
+    
+    json_string = response.text
+    data = json.loads(json_string)
+    
+    return data
+
 def getGameInfo(appid: int):
     """
     根据Steam AppID，通过Steam Web API获取游戏的名称和厂商名。
@@ -183,8 +206,16 @@ async def handle_function(event):
     tableFilter = f"where=(gameId,eq,{goodId})"
     wishlistTableUrl = f"{nocoUrl}/{wishlistTableId}/records?{tableFilter}"
     wishlistRecord = getRecord(wishlistTableUrl)
+    
     if "id" in wishlistRecord:
-        await wish.finish(f'id为{goodId}的游戏\n《{gameInfo["game_name"]}》\n已经被{wishlistRecord["userName"]}许过愿了\n下次早点来吧')
+        
+         link = f'https://store.steampowered.com/app/{goodId}'
+        
+         wishlistTableUrl = f"{nocoUrl}/{wishlistTableId}/records"
+        
+         updateWishlistRecord = updateRecord (wishlistTableUrl, wishlistRecord["gameId"],  wishlistRecord["gameName"],gameInfo["release_date"], wishlistRecord['id'])
+         if wishlistRecord['id'] == updateWishlistRecord['id']:
+            await wish.finish(f'id为{goodId}的游戏\n《{gameInfo["game_name"]}》\n已经被{wishlistRecord["userName"]}许过愿了\n下次早点来吧')
     else:
 
         dayTime = datetime.date.today().strftime('%Y-%m-%d')
