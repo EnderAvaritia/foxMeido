@@ -213,7 +213,8 @@ async def handle_function(event):
         
          wishlistTableUrl = f"{nocoUrl}/{wishlistTableId}/records"
         
-         updateWishlistRecord = updateRecord (wishlistTableUrl, wishlistRecord["gameId"],  wishlistRecord["gameName"],gameInfo["release_date"], wishlistRecord['id'])
+         updateWishlistRecord = updateRecord (wishlistTableUrl, goodId,  gameInfo["game_name"], gameInfo["release_date"], wishlistRecord['id'])
+         # 借用许愿来更新条目
          if wishlistRecord['id'] == updateWishlistRecord['id']:
             await wish.finish(f'id为{goodId}的游戏\n《{gameInfo["game_name"]}》\n已经被{wishlistRecord["userName"]}许过愿了\n下次早点来吧')
     else:
