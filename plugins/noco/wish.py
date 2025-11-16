@@ -189,7 +189,7 @@ async def handle_function(event):
     goodId = str(event.message).strip()
     goodId = re.findall(r"(?<=app/)(\d+)|(\d{5,11})", goodId)
     if not goodId:
-        await steamGoods.send("你确定这是商品的id？")
+        await wish.send("你确定这是商品的id？")
     goodId = tuple(item for item in goodId[0] if item)[0]
     gameInfo = getGameInfo(goodId)
     if "error" in gameInfo:
