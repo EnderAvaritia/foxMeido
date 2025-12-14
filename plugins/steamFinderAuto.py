@@ -82,9 +82,17 @@ async def get_message(goodId):
     if "error" in gameInfo:
         await steamGoods.finish(f"游戏{goodId}数据获取出错，请反馈")   
     pic_data = await take_screenshot(appid)
+    
+    #格式化价格
+    if gameInfo["currency"]:
+        price_format = f'\n原价：{str(gameInfo["initial"])+gameInfo["currency"]}\n现价：{str(gameInfo["final"])+gameInfo["currency"]}\n折扣：-{100-(gameInfo["final"]/gameInfo["initial"]*100)}%'
+        print(price_format)
+    else :
+        price_format = ''
+    
     if pic_data:
         pic = MessageSegment.image(pic_data)
-        return f'游戏名：{gameInfo["game_name"]}\n支持语言：{gameInfo["supported_languages"]}\n发售日期：{gameInfo["release_date"]}\n发行商：{gameInfo["publisher"]}\nSteam商店页链接：https://store.steampowered.com/app/{appid}' + pic        
+        return f'游戏名：{gameInfo["game_name"]}\n支持语言：{gameInfo["supported_languages"]}\n发售日期：{gameInfo["release_date"]}\n发行商：{gameInfo["publisher"]}{price_format}\nSteam商店页链接：https://store.steampowered.com/app/{appid}' + pic        
 
 # async def fetch_title(url: str) -> str:
     # proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
@@ -172,9 +180,31 @@ async def getGameInfo(appid: int):
                     print(f"获取到支持语言: {supported_languages}")
                 else:
                     errors.append(f"API返回的发行日期为空或未找到 (AppID: {appid})")
-                    print(errors[-1])                    
-                    
-                 
+                    print(errors[-1]) 
+
+                # 获取价格
+                try:
+                    price = details.get('price_overview')
+                    if price:
+                        print(f"获取到价格: {price}")
+                        initial = int(price.get('initial'))/1000
+                        final = int(price.get('final'))/1000
+                        currency = price.get('currency')
+                        
+                    else:
+                        errors.append(f"API返回的价格为空或未找到 (AppID: {appid})")
+                        print(errors.pop())
+                        initial = 1
+                        final = 1
+                        currency = None
+                
+                except Exception as e:
+                    errors.append(f"处理API响应时发生未知错误: {e}")
+                    initial = 1
+                    final = 1
+                    currency = None
+                    print(errors[-1])
+					
             else:
                 errors.append(f"API返回数据中未找到'data'详情 (AppID: {appid})")
                 print(errors[-1])
@@ -196,8 +226,10 @@ async def getGameInfo(appid: int):
         "game_name": game_name,
         "publisher": publisher,
         "release_date":release_date,
-        "supported_languages":supported_languages
-        
+        "supported_languages":supported_languages,
+        "initial":initial,
+        "final":final,
+        "currency":currency
     }
     if errors:
         result["error"] = "; ".join(errors)
