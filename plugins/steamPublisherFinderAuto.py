@@ -10,6 +10,8 @@ from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 from nonebot.params import CommandArg
 from nonebot.rule import to_me
 from playwright.async_api import async_playwright
+from playwright.async_api import Error as PWError
+from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 from nonebot import on_startswith
 
@@ -107,6 +109,15 @@ async def take_screenshot(url: str):
         
         print("screenshot_bytes")
         screenshot_bytes = await page.locator('xpath=//div[@id="RecommendationsRows"]').screenshot()
+        try:
+            # 例如等待某个元素并截图
+            screenshot_bytes = await page.locator('xpath=//div[@class="glance_ctn"]').screenshot()
+        except PlaywrightTimeout:
+            print("截图超时，30 秒内元素未出现")
+            screenshot_bytes = None
+        except PlaywrightError as e:
+            print("页面打开失败:", e.message)
+            screenshot_bytes = None
 
         # print(type(screenshot_bytes))
         # base64_data = base64.b64encode(screenshot_bytes).decode("utf-8")

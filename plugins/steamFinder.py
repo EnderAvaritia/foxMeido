@@ -10,6 +10,8 @@ from nonebot.adapters.qq import MessageSegment
 from nonebot.params import CommandArg
 from nonebot.rule import to_me
 from playwright.async_api import async_playwright
+from playwright.async_api import Error as PWError
+from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 								 
 
