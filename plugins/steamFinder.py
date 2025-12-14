@@ -83,8 +83,6 @@ async def get_message(goodId):
     if "error" in gameInfo:
         await steamGoods.finish(f"游戏{goodId}数据获取出错，请反馈")   
     pic_data = await take_screenshot(appid)
-    if pic_data is None:
-        pic_data = '截图超时，请联系'
     
     #格式化价格
     if gameInfo["currency"]:
@@ -95,7 +93,10 @@ async def get_message(goodId):
     
     if pic_data:
         pic = MessageSegment.image(pic_data)
-        return f'游戏名：{gameInfo["game_name"]}\n支持语言：{gameInfo["supported_languages"]}\n发售日期：{gameInfo["release_date"]}\n发行商：{gameInfo["publisher"]}{price_format}\nSteam商店页链接：https://store.steampowered.com/app/{appid}\n' + pic        
+    else:
+        pic = '截图超时，请联系'
+        
+    return f'游戏名：{gameInfo["game_name"]}\n支持语言：{gameInfo["supported_languages"]}\n发售日期：{gameInfo["release_date"]}\n发行商：{gameInfo["publisher"]}{price_format}\nSteam商店页链接：https://store.steampowered.com/app/{appid}\n' + pic        
 
 # async def fetch_title(url: str) -> str:
     # proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
