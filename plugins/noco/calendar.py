@@ -26,9 +26,11 @@ async def init_playwright():
         browser = await playwright.chromium.launch(headless=True)
 																	
         cookies: list = []
+        #playwright的cookie严格区分站点
         context = await browser.new_context(proxy={"server": "http://127.0.0.1:7890"})
         await context.add_cookies(cookies=cookies)
         page = await context.new_page()
+        # await page.set_viewport_size(({"width": 800, "height": 1920}))
 
 
 calendar = on_command("calendar", rule=to_me(), aliases={"cale", "愿望单", "冤枉单","任务"}, priority=10, block=True)

@@ -21,7 +21,7 @@ tableFilter = f"where=(account,eq,353662379)"
 
 # url = f"{nocoUrl}/{tableId}/records?{tableFilter}"
 
-#cookie用cookie editor导出的hander string就行
+#使用抓包获得的
 cookie = ""
 
 # wish = on_command("wish", rule=to_me(), aliases={"wish"}, priority=10, block=True)
@@ -188,7 +188,19 @@ def addToWishlist(appid: str | int, cookie: str) -> str:
     """
     url = "https://store.steampowered.com/api/addtowishlist"
     payload = {"appid": str(appid)}
-    headers = {"Cookie": cookie.strip()}
+    headers = {
+    'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:146.0) Gecko/20100101 Firefox/146.0",
+    'Accept-Encoding': "gzip, deflate, br, zstd",
+    'Accept-Language': "en-US,en;q=0.5",
+    'X-Requested-With': "XMLHttpRequest",
+    'Origin': "https://store.steampowered.com",
+    'Sec-GPC': "1",
+    'Referer': "https://store.steampowered.com/app/4013460/_/",
+    'Sec-Fetch-Dest': "empty",
+    'Sec-Fetch-Mode': "cors",
+    'Sec-Fetch-Site': "same-origin",
+    "Cookie": cookie.strip()
+    }
 
     response = requests.post(url, data=payload, headers=headers)
     try:
@@ -213,6 +225,14 @@ async def handle_function(event):
         await wish.send("你确定这是商品的id？")
     goodId = tuple(item for item in goodId[0] if item)[0]
     gameInfo = getGameInfo(goodId)
+    
+    if cookie:
+        addToWishlistResult = addToWishlist(goodId,cookie)
+        print(goodId)
+        if addToWishlistResult:
+            print("愿望单添加成功")
+        else:
+            print("愿望单添加失败")
     if "error" in gameInfo:
         await wish.finish(f"游戏{goodId}数据获取出错，请反馈")
     # 获取游戏对应信息
@@ -234,18 +254,11 @@ async def handle_function(event):
         
          wishlistTableUrl = f"{nocoUrl}/{wishlistTableId}/records"
         
-         updateWishlistRecord = updateRecord (wishlistTableUrl, goodId,  gameInfo["game_name"], gameInfo["release_date"], wishlistRecord['id'])
+         updateWishlistRecord = updateRecord (wishlistTableUrl, goodId, gameInfo["game_name"], gameInfo["release_date"], wishlistRecord['id'])
          # 借用许愿来更新条目
          if wishlistRecord['id'] == updateWishlistRecord['id']:
             await wish.finish(f'id为{goodId}的游戏\n《{gameInfo["game_name"]}》\n已经被{wishlistRecord["userName"]}许过愿了\n下次早点来吧')
     else:
-        if cookie:
-            addToWishlistResult = addToWishlist(goodId,cookie)
-            if addToWishlistResult:
-                print("愿望单添加成功")
-            else:
-                print("愿望单添加失败")
-            
             
         dayTime = datetime.date.today().strftime('%Y-%m-%d')
 
