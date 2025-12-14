@@ -83,6 +83,8 @@ async def get_message(goodId):
     if "error" in gameInfo:
         await steamGoods.finish(f"游戏{goodId}数据获取出错，请反馈")   
     pic_data = await take_screenshot(appid)
+    if pic_data is None:
+        pic_data = '截图超时，请联系'
     
     #格式化价格
     if gameInfo["currency"]:
@@ -93,7 +95,7 @@ async def get_message(goodId):
     
     if pic_data:
         pic = MessageSegment.image(pic_data)
-        return f'游戏名：{gameInfo["game_name"]}\n支持语言：{gameInfo["supported_languages"]}\n发售日期：{gameInfo["release_date"]}\n发行商：{gameInfo["publisher"]}{price_format}\nSteam商店页链接：https://store.steampowered.com/app/{appid}' + pic        
+        return f'游戏名：{gameInfo["game_name"]}\n支持语言：{gameInfo["supported_languages"]}\n发售日期：{gameInfo["release_date"]}\n发行商：{gameInfo["publisher"]}{price_format}\nSteam商店页链接：https://store.steampowered.com/app/{appid}\n' + pic        
 
 # async def fetch_title(url: str) -> str:
     # proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
@@ -188,8 +190,8 @@ async def getGameInfo(appid: int):
                     price = details.get('price_overview')
                     if price:
                         print(f"获取到价格: {price}")
-                        initial = int(price.get('initial'))/1000
-                        final = int(price.get('final'))/1000
+                        initial = int(price.get('initial'))/100
+                        final = int(price.get('final'))/100
                         currency = price.get('currency')
                         
                     else:
@@ -205,7 +207,7 @@ async def getGameInfo(appid: int):
                     final = 1
                     currency = None
                     print(errors[-1])
-					
+                    
             else:
                 errors.append(f"API返回数据中未找到'data'详情 (AppID: {appid})")
                 print(errors[-1])
@@ -257,7 +259,16 @@ async def take_screenshot(appid: str):
             await page.click('//a[@id="view_product_page_btn"]')
         
         print("screenshot_bytes")
-        screenshot_bytes = await page.locator('xpath=//div[@class="glance_ctn"]').screenshot()
+        # screenshot_bytes = await page.locator('xpath=//div[@class="glance_ctn"]').screenshot()
+        try:
+            # 例如等待某个元素并截图
+            screenshot_bytes = await page.locator('xpath=//div[@class="glance_ctn"]').screenshot()
+        except PlaywrightTimeout:
+            print("截图超时，30 秒内元素未出现")
+            screenshot_bytes = None
+        except PlaywrightError as e:
+            print("页面打开失败:", e.message)
+            screenshot_bytes = None
 
         # print(type(screenshot_bytes))
         # base64_data = base64.b64encode(screenshot_bytes).decode("utf-8")
