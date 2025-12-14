@@ -21,6 +21,8 @@ tableFilter = f"where=(account,eq,353662379)"
 
 # url = f"{nocoUrl}/{tableId}/records?{tableFilter}"
 
+#cookie用cookie editor导出的hander string就行
+cookie = ""
 
 # wish = on_command("wish", rule=to_me(), aliases={"wish"}, priority=10, block=True)
 wish = on_command("wish", aliases={"wish"}, priority=10, block=True)
@@ -177,6 +179,25 @@ def getGameInfo(appid: int):
     
     return result
 
+def addToWishlist(appid: str | int, cookie: str) -> str:
+    """
+    将指定 appid 的游戏加入 Steam 愿望单
+    :param appid: 游戏 ID
+    :param cookie: 登录后的 Cookie 字符串
+    :return: 接口返回的原始文本
+    """
+    url = "https://store.steampowered.com/api/addtowishlist"
+    payload = {"appid": str(appid)}
+    headers = {"Cookie": cookie.strip()}
+
+    response = requests.post(url, data=payload, headers=headers)
+    try:
+        data = response.json()
+    except ValueError:
+        return False
+
+    # 只要 wishlistCount 字段存在即认为接口正常执行
+    return "wishlistCount" in data
     
 @wish.handle()
 async def handle_function(event):
@@ -218,7 +239,14 @@ async def handle_function(event):
          if wishlistRecord['id'] == updateWishlistRecord['id']:
             await wish.finish(f'id为{goodId}的游戏\n《{gameInfo["game_name"]}》\n已经被{wishlistRecord["userName"]}许过愿了\n下次早点来吧')
     else:
-
+        if cookie:
+            addToWishlistResult = addToWishlist(goodId,cookie)
+            if addToWishlistResult:
+                print("愿望单添加成功")
+            else:
+                print("愿望单添加失败")
+            
+            
         dayTime = datetime.date.today().strftime('%Y-%m-%d')
 
         link = f'https://store.steampowered.com/app/{goodId}'
