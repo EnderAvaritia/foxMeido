@@ -10,6 +10,9 @@ import requests
 import json
 import re
 
+proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
+
+
 nocoUrl = "https://127.0.0.1:52533/api/v2/tables"
 wishlistTableId = "tableId"
 accountTableId = "tableId"
@@ -114,7 +117,6 @@ def getGameInfo(appid: int):
     # --- 通过Steam Web API 获取游戏名称和厂商名 ---
     api_url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=schinese"
     print(f"正在请求API接口: {api_url}")
-    proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
 
 
     try:
@@ -202,7 +204,7 @@ def addToWishlist(appid: str | int, cookie: str) -> str:
     "Cookie": cookie.strip()
     }
 
-    response = requests.post(url, data=payload, headers=headers)
+    response = requests.post(url, data=payload, headers=headers, proxies=proxies)
     try:
         data = response.json()
     except ValueError:
