@@ -95,6 +95,7 @@ async def take_screenshot(url: str):
     print("new_browser")
     if page:
         await page.goto(url)
+        # await page.goto(url, wait_until="domcontentloaded")
         print("page_goto")
         title = page.title()
         if await title == "Welcome to Steam":
