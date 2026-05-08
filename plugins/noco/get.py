@@ -169,13 +169,38 @@ def getGameInfo(appid: int):
 @get.handle()
 async def handle_function(event):
     
-    userId = event.user_id
-    # userId = event.author.id
+    # 获取消息内容并分割参数
+    message_str = str(event.message).strip()
+    params = message_str.split()
     
-    nickname = event.sender.nickname
+    # 根据参数数量决定使用哪个用户ID
+    if len(params) == 2:
+        # 两个参数：第一个是goodId，第二个是userId
+        goodId_str = params[0]
+        userId_str = params[1]
+        
+        # 尝试将userId转换为整数
+        try:
+            userId = int(userId_str)
+        except ValueError:
+            await get.finish(f"用户ID格式错误：{userId_str}")
+            
+        # 使用输入的userId，而不是event.user_id
+        # 注意：这里需要获取对应用户的昵称，但event.sender.nickname是当前发送者的昵称
+        # 对于这种情况，我们可能需要从数据库获取对应用户的昵称
+        # 暂时先使用当前发送者的昵称，或者可以修改为从数据库查询
+        nickname = event.sender.nickname
+        
+    elif len(params) == 1:
+        # 一个参数：只有goodId，使用event.user_id
+        goodId_str = params[0]
+        userId = event.user_id
+        nickname = event.sender.nickname
+    else:
+        await get.finish("参数错误！用法：\n1. get <商品ID> - 为自己登记\n2. get <商品ID> <用户ID> - 为指定用户登记")
     
-    goodId = str(event.message).strip()
-    goodId = re.findall(r"(?<=app/)(\d+)|(\d{5,11})", goodId)
+    # 从goodId_str中提取数字ID
+    goodId = re.findall(r"(?<=app/)(\d+)|(\d{5,11})", goodId_str)
     if not goodId:
         await get.send("你确定这是商品的id？")
     goodId = tuple(item for item in goodId[0] if item)[0]
@@ -198,9 +223,18 @@ async def handle_function(event):
     
     accountRecord = getRecord(accountTableUrl)
     if "id" not in accountRecord:
-        await get.finish(f"请id为{userId}的\n{nickname}先使用bind指令进行登记")
+        # 当使用指定用户ID时，我们不知道该用户的昵称，所以只显示用户ID
+        await get.finish(f"用户ID {userId} 尚未绑定，请先使用bind指令进行登记")
     # 获取账号对应信息
 
+    # 检查用户是否已经登记过这个游戏
+    tableFilter = f"where=(gameId,eq,{goodId})~and(userId,eq,{userId})"
+    checkRecordUrl = f"{nocoUrl}/{recordTableId}/records?{tableFilter}"
+    existingRecord = getRecord(checkRecordUrl)
+    
+    if "id" in existingRecord:
+        await get.finish(f'用户ID {userId} (昵称: {accountRecord["nickname"]})\n已经登记过游戏ID {goodId}《{gameInfo["game_name"]}》\n登记ID: {existingRecord["id"]}')
+    
     dayTime = datetime.date.today().strftime('%Y-%m-%d')
 
     link = f'https://steamcommunity.com/profiles/{accountRecord["steamId"]}/recommended/{goodId}'
@@ -216,4 +250,4 @@ async def handle_function(event):
         canBeClaimed = bool(remainGameRecord["totalCount"] - remainGameRecord["getedCount"] - 1)
         remain = updateRecord (remainTableUrl, remainGameRecord["id"], gameInfo["game_name"], remainGameRecord["getedCount"] + 1, canBeClaimed)
         if "id" in remain :
-            await get.finish(f'id为{userId}的用户{nickname}\n对id为{goodId}的游戏《{gameInfo["game_name"]}》\n成功登记为第{recordResult["id"]}个结果\n游戏剩余{remainGameRecord["totalCount"] - remainGameRecord["getedCount"] - 1}个')
+            await get.finish(f'用户ID {userId} (昵称: {accountRecord["nickname"]})\n对游戏ID {goodId}《{gameInfo["game_name"]}》\n成功登记为第{recordResult["id"]}个结果\n游戏剩余{remainGameRecord["totalCount"] - remainGameRecord["getedCount"] - 1}个')
