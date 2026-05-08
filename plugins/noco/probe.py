@@ -73,7 +73,7 @@ def check_link_valid(link):
         }
         
         # 发送请求
-        response = requests.get(link, headers=headers, timeout=10, verify=False)
+        response = requests.get(link, headers=headers, timeout=10, proxies=proxies, verify=False)
         response.raise_for_status()
         
         # 检查响应内容

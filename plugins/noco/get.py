@@ -22,6 +22,7 @@ tableFilter = f"where=(account,eq,353662379)"
 
 # url = f"{nocoUrl}/{tableId}/records?{tableFilter}"
 
+proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
 
 # get = on_command("get", rule=to_me(), aliases={"get"}, priority=10, block=True)
 get = on_command("get", aliases={"get"}, priority=10, block=True)
@@ -60,20 +61,22 @@ def createRecord (url, gameId, gameName, userId, userName, steamid, link, dayTim
     response = requests.post(url, data=json.dumps(payload), headers=headers)
     # response = requests.post(url, data=json.dumps(payload), headers=headers, verify=False)
 
-    # print(response.text)
+    print(f"创建记录响应: {response.text}")
     
     json_string = response.text
     data = json.loads(json_string)
     
     return data
 
-def updateRecord (url, recordId, gameName, getedCount, canBeClaimed):
+def updateRecord (url, recordId, gameId, gameName, totalCount, getedCount, canBeClaimed):
     
     payload = {
     "id": recordId,
+    "gameId": gameId,
     "gameName": gameName,
+    "totalCount": totalCount,
     "getedCount": getedCount,
-    "canBeClaimed": canBeClaimed
+    "canBeClaimed_1": canBeClaimed
     }
     headers = {
     'Content-Type': "application/json",
@@ -83,7 +86,7 @@ def updateRecord (url, recordId, gameName, getedCount, canBeClaimed):
     response = requests.patch(url, data=json.dumps(payload), headers=headers)
     # response = requests.patch(url, data=json.dumps(payload), headers=headers, verify=False)
 
-    # print(response.text)
+    print(f"更新记录响应: {response.text}")
     
     json_string = response.text
     data = json.loads(json_string)
@@ -113,7 +116,7 @@ def getGameInfo(appid: int):
     print(f"正在请求API接口: {api_url}")
 
     try:
-        response = requests.get(api_url, timeout=10)
+        response = requests.get(api_url, proxies=proxies, timeout=10)
         response.raise_for_status()  # 检查HTTP状态码，如果不是200则抛出异常
 
         data = response.json()
@@ -167,11 +170,11 @@ def getGameInfo(appid: int):
 
     
 @get.handle()
-async def handle_function(event):
+async def handle_function(event: MessageEvent, args: Message = CommandArg()):
     
-    # 获取消息内容并分割参数
-    message_str = str(event.message).strip()
-    params = message_str.split()
+    # 获取参数并分割
+    args_str = args.extract_plain_text().strip()
+    params = args_str.split()
     
     # 根据参数数量决定使用哪个用户ID
     if len(params) == 2:
@@ -202,7 +205,7 @@ async def handle_function(event):
     # 从goodId_str中提取数字ID
     goodId = re.findall(r"(?<=app/)(\d+)|(\d{5,11})", goodId_str)
     if not goodId:
-        await get.send("你确定这是商品的id？")
+        await get.finish("你确定这是商品的id？")
     goodId = tuple(item for item in goodId[0] if item)[0]
     gameInfo = getGameInfo(goodId)
     if "error" in gameInfo:
@@ -248,6 +251,6 @@ async def handle_function(event):
     else:
         remainTableUrl = f"{nocoUrl}/{remainTableId}/records"
         canBeClaimed = bool(remainGameRecord["totalCount"] - remainGameRecord["getedCount"] - 1)
-        remain = updateRecord (remainTableUrl, remainGameRecord["id"], gameInfo["game_name"], remainGameRecord["getedCount"] + 1, canBeClaimed)
+        remain = updateRecord (remainTableUrl, remainGameRecord["id"], goodId, gameInfo["game_name"], remainGameRecord["totalCount"], remainGameRecord["getedCount"] + 1, canBeClaimed)
         if "id" in remain :
             await get.finish(f'用户ID {userId} (昵称: {accountRecord["nickname"]})\n对游戏ID {goodId}《{gameInfo["game_name"]}》\n成功登记为第{recordResult["id"]}个结果\n游戏剩余{remainGameRecord["totalCount"] - remainGameRecord["getedCount"] - 1}个')
