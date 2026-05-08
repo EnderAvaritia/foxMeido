@@ -246,7 +246,7 @@ async def handle_function(event):
         await wish.finish(f"请id为{userId}的\n{nickname}先使用bind指令进行登记")
     # 获取账号对应信息
     
-    tableFilter = f"where=(gameId,eq,{goodId})"
+    tableFilter = f"where=(gameId,eq,{goodId})~and(userId,eq,{userId})"
     wishlistTableUrl = f"{nocoUrl}/{wishlistTableId}/records?{tableFilter}"
     wishlistRecord = getRecord(wishlistTableUrl)
     
@@ -259,7 +259,8 @@ async def handle_function(event):
          updateWishlistRecord = updateRecord (wishlistTableUrl, goodId, gameInfo["game_name"], gameInfo["release_date"], wishlistRecord['id'])
          # 借用许愿来更新条目
          if wishlistRecord['id'] == updateWishlistRecord['id']:
-            await wish.finish(f'id为{goodId}的游戏\n《{gameInfo["game_name"]}》\n已经被{wishlistRecord["userName"]}许过愿了\n下次早点来吧')
+            # await wish.finish(f'id为{goodId}的游戏\n《{gameInfo["game_name"]}》\n已经被{wishlistRecord["userName"]}许过愿了\n下次早点来吧')
+            await wish.finish(f'id为{goodId}的游戏\n《{gameInfo["game_name"]}》\n已经在{wishlistRecord["submitTime"]}被你许过愿了')
     else:
             
         dayTime = datetime.date.today().strftime('%Y-%m-%d')
