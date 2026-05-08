@@ -1,12 +1,17 @@
 """
-remain.py - 剩余游戏登记插件
+remain.py - 剩余游戏登记和查询插件
 
 功能：
 1. 使用 remain 指令登记剩余的游戏份数
-2. 指令格式：remain 游戏ID/URL 份数
-3. 示例：
+2. 使用 remain 指令查询游戏的当前领取情况
+3. 指令格式：
+   - remain 游戏ID/URL 份数 （登记或更新份数）
+   - remain 游戏ID/URL （查询当前领取情况）
+4. 示例：
    - remain 730 5 （登记CS:GO 5份）
    - remain https://store.steampowered.com/app/730 5 （通过URL登记CS:GO 5份）
+   - remain 730 （查询CS:GO当前领取情况）
+   - remain https://store.steampowered.com/app/730 （通过URL查询当前领取情况）
 
 表格字段：
 - gameId: 游戏ID（Steam AppID）
@@ -24,6 +29,7 @@ remain.py - 剩余游戏登记插件
 - 如果游戏不存在记录，会创建新记录
 - 游戏名称通过Steam API自动获取
 - 支持从Steam商店URL中自动提取游戏ID
+- 查询功能不需要游戏名称，即使Steam API不可用也能查询
 """
 
 from nonebot import on_command
@@ -176,12 +182,10 @@ async def handle_function(event: MessageEvent, args: Message = CommandArg()):
     # 解析参数
     arg_text = args.extract_plain_text().strip()
     if not arg_text:
-        await remain.finish("请输入游戏ID/URL和份数，格式：remain 游戏ID/URL 份数")
+        await remain.finish("请输入游戏ID/URL和份数，格式：remain 游戏ID/URL 份数\n或输入游戏ID/URL查询当前领取情况")
     
     # 分割参数
     parts = arg_text.split()
-    if len(parts) < 2:
-        await remain.finish("请输入游戏ID/URL和份数，格式：remain 游戏ID/URL 份数")
     
     # 提取游戏ID（支持纯数字ID或URL）
     game_input = parts[0]
@@ -199,70 +203,97 @@ async def handle_function(event: MessageEvent, args: Message = CommandArg()):
         else:
             await remain.finish("未检测到有效的游戏ID，请提供Steam游戏ID或Steam商店链接")
     
-    try:
-        count = int(parts[1])
-        if count <= 0:
-            await remain.finish("份数必须大于0")
-    except ValueError:
-        await remain.finish("份数必须是整数")
-    
-    # 获取游戏信息
-    game_info = getGameInfo(game_id)
-    
-    if "error" in game_info:
-        await remain.finish(f"游戏{game_id}数据获取出错：{game_info['error']}")
-    
-    if not game_info["game_name"]:
-        await remain.finish(f"无法获取游戏{game_id}的名称，请检查游戏ID是否正确")
-    
     # 检查是否已存在该游戏的记录
     tableFilter = f"where=(gameId,eq,{game_id})"
     remainTableUrl = f"{nocoUrl}/{remainTableId}/records?{tableFilter}"
     existing_record = getRecord(remainTableUrl)
     
-    if "id" in existing_record:
-        # 更新现有记录
-        remainTableUrl = f"{nocoUrl}/{remainTableId}/records"
-        # new_total_count = existing_record["totalCount"] + count
-        new_total_count = count
-        update_result = updateRecord(
-            remainTableUrl, 
-            game_id, 
-            game_info["game_name"], 
-            new_total_count, 
-            existing_record["getedCount"], 
-            existing_record["id"]
-        )
-        
-        if "id" in update_result:
+    if len(parts) == 1:
+        # 只有一个参数：查询当前领取情况
+        if "id" in existing_record:
+            # 游戏已登记，显示当前状态
+            remaining = existing_record["totalCount"] - existing_record["getedCount"]
             await remain.finish(
-                f"游戏《{game_info['game_name']}》(ID: {game_id}) 的剩余份数已更新\n"
-                f"原总份数: {existing_record['totalCount']}\n"
-                # f"新增份数: {count}\n"
-                f"现总份数: {new_total_count}\n"
+                f"游戏《{existing_record['gameName']}》(ID: {game_id}) 当前领取情况：\n"
+                f"总份数: {existing_record['totalCount']}\n"
                 f"已领取份数: {existing_record['getedCount']}\n"
-                f"剩余可领取: {new_total_count - existing_record['getedCount']}"
+                f"剩余可领取: {remaining}\n"
+                f"记录ID: {existing_record['id']}"
             )
         else:
-            await remain.finish("更新记录失败，请检查网络或配置")
-    else:
-        # 创建新记录
-        remainTableUrl = f"{nocoUrl}/{remainTableId}/records"
-        create_result = createRecord(
-            remainTableUrl, 
-            game_id, 
-            game_info["game_name"], 
-            count, 
-            0  # 初始已领取份数为0
-        )
+            # 游戏未登记
+            # 获取游戏信息用于显示名称
+            game_info = getGameInfo(game_id)
+            if "error" in game_info:
+                game_name = f"ID: {game_id}"
+            else:
+                game_name = game_info.get("game_name", f"ID: {game_id}")
+            
+            await remain.finish(f"游戏《{game_name}》(ID: {game_id}) 尚未登记剩余份数")
+    
+    elif len(parts) >= 2:
+        # 两个参数：登记或更新份数
+        try:
+            count = int(parts[1])
+            if count <= 0:
+                await remain.finish("份数必须大于0")
+        except ValueError:
+            await remain.finish("份数必须是整数")
         
-        if "id" in create_result:
-            await remain.finish(
-                f"游戏《{game_info['game_name']}》(ID: {game_id}) 已成功登记\n"
-                f"总份数: {count}\n"
-                f"已领取份数: 0\n"
-                f"剩余可领取: {count}\n"
-                f"记录ID: {create_result['id']}"
+        # 获取游戏信息
+        game_info = getGameInfo(game_id)
+        
+        if "error" in game_info:
+            await remain.finish(f"游戏{game_id}数据获取出错：{game_info['error']}")
+        
+        if not game_info["game_name"]:
+            await remain.finish(f"无法获取游戏{game_id}的名称，请检查游戏ID是否正确")
+        
+        if "id" in existing_record:
+            # 更新现有记录
+            remainTableUrl = f"{nocoUrl}/{remainTableId}/records"
+            # new_total_count = existing_record["totalCount"] + count
+            new_total_count = count
+            update_result = updateRecord(
+                remainTableUrl, 
+                game_id, 
+                game_info["game_name"], 
+                new_total_count, 
+                existing_record["getedCount"], 
+                existing_record["id"]
             )
+            
+            if "id" in update_result:
+                await remain.finish(
+                    f"游戏《{game_info['game_name']}》(ID: {game_id}) 的剩余份数已更新\n"
+                    f"原总份数: {existing_record['totalCount']}\n"
+                    # f"新增份数: {count}\n"
+                    f"现总份数: {new_total_count}\n"
+                    f"已领取份数: {existing_record['getedCount']}\n"
+                    f"剩余可领取: {new_total_count - existing_record['getedCount']}"
+                )
+            else:
+                await remain.finish("更新记录失败，请检查网络或配置")
         else:
-            await remain.finish("创建记录失败，请检查网络或配置")
+            # 创建新记录
+            remainTableUrl = f"{nocoUrl}/{remainTableId}/records"
+            create_result = createRecord(
+                remainTableUrl, 
+                game_id, 
+                game_info["game_name"], 
+                count, 
+                0  # 初始已领取份数为0
+            )
+            
+            if "id" in create_result:
+                await remain.finish(
+                    f"游戏《{game_info['game_name']}》(ID: {game_id}) 已成功登记\n"
+                    f"总份数: {count}\n"
+                    f"已领取份数: 0\n"
+                    f"剩余可领取: {count}\n"
+                    f"记录ID: {create_result['id']}"
+                )
+            else:
+                await remain.finish("创建记录失败，请检查网络或配置")
+    else:
+        await remain.finish("请输入游戏ID/URL和份数，格式：remain 游戏ID/URL 份数\n或输入游戏ID/URL查询当前领取情况")
