@@ -10,14 +10,14 @@ import json
 import re
 
 nocoUrl = "https://127.0.0.1:52533/api/v2/tables"
-tableId = "tableId"
+accountTableId = "tableId"
 
 token = "token"
 headers = {"xc-token": token}
 
 tableFilter = f"where=(account,eq,353662379)"
 
-# url = f"{nocoUrl}/{tableId}/records?{tableFilter}"
+# url = f"{nocoUrl}/{accountTableId}/records?{tableFilter}"
 
 
 # bind = on_command("bind", rule=to_me(), aliases={"bind"}, priority=10, block=True)
@@ -91,7 +91,7 @@ async def handle_function(event):
     nickname = event.sender.nickname
     
     tableFilter = f"where=(account,eq,{userId})"
-    url = f"{nocoUrl}/{tableId}/records?{tableFilter}"
+    url = f"{nocoUrl}/{accountTableId}/records?{tableFilter}"
     
     record = getRecord(url)
     # 获取是否存在已有的记录,返回是是一个包含id的数组
@@ -114,7 +114,7 @@ async def handle_function(event):
     
     # await bind.send(f"{userId}:{steamid}")
     
-    url = f"{nocoUrl}/{tableId}/records"
+    url = f"{nocoUrl}/{accountTableId}/records"
     if "id" not in record:
         recordId = createRecord(url, userId, steamid, nickname)
         await bind.finish(f"{nickname}用户的id：{userId}\n{steamid}\n已被登记为第{recordId}个结果")
