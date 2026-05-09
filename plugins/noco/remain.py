@@ -71,11 +71,14 @@ def getRecord(url):
 
 def createRecord(url, gameId, gameName, totalCount, getedCount=0):
     """创建剩余游戏记录"""
+    # 计算canBeClaimed：剩余可领取数量
+    can_be_claimed = totalCount - getedCount
     payload = {
         "gameId": gameId,
         "gameName": gameName,
         "totalCount": totalCount,
-        "getedCount": getedCount
+        "getedCount": getedCount,
+        "canBeClaimed": can_be_claimed
     }
     
     headers = {
@@ -91,14 +94,15 @@ def createRecord(url, gameId, gameName, totalCount, getedCount=0):
     
     return data
 
-def updateRecord(url, gameId, gameName, totalCount, getedCount, recordId):
+def updateRecord(url, gameId, gameName, totalCount, getedCount, canBeClaimed, recordId):
     """更新剩余游戏记录"""
     payload = {
         "id": recordId,
         "gameId": gameId,
         "gameName": gameName,
         "totalCount": totalCount,
-        "getedCount": getedCount
+        "getedCount": getedCount,
+        "canBeClaimed": canBeClaimed
     }
     
     headers = {
@@ -181,8 +185,42 @@ async def handle_function(event: MessageEvent, args: Message = CommandArg()):
     """处理remain指令"""
     # 解析参数
     arg_text = args.extract_plain_text().strip()
+    
+    # 如果没有参数，显示所有可领取的游戏
     if not arg_text:
-        await remain.finish("请输入游戏ID/URL和份数，格式：remain 游戏ID/URL 份数\n或输入游戏ID/URL查询当前领取情况")
+        # 构建查询URL：where=(canBeClaimed,gt,0)&sort=created_at
+        tableFilter = "where=(canBeClaimed,gt,0)&sort=created_at"
+        remainTableUrl = f"{nocoUrl}/{remainTableId}/records?{tableFilter}"
+        
+        try:
+            response = requests.get(remainTableUrl, headers=headers)
+            response.raise_for_status()
+            
+            data = response.json()
+            games = data.get('list', [])
+            
+            if not games:
+                await remain.finish("当前没有可领取的游戏")
+            
+            # 构建输出消息
+            output_lines = []
+            for game in games:
+                game_name = game.get('gameName', '未知游戏')
+                can_be_claimed = game.get('canBeClaimed', 0)
+                # 注意：canBeClaimed字段可能是字符串类型，需要转换为整数
+                try:
+                    can_be_claimed_int = int(can_be_claimed)
+                except (ValueError, TypeError):
+                    can_be_claimed_int = 0
+                
+                output_lines.append(f"《{game_name}》剩余{can_be_claimed_int}个")
+            
+            # 添加查询URL信息
+            output_lines.insert(0, f"查询URL: {tableFilter}")
+            await remain.finish("\r\n".join(output_lines))
+            
+        except Exception as e:
+            await remain.finish(f"查询可领取游戏时出错: {str(e)}")
     
     # 分割参数
     parts = arg_text.split()
@@ -254,12 +292,15 @@ async def handle_function(event: MessageEvent, args: Message = CommandArg()):
             remainTableUrl = f"{nocoUrl}/{remainTableId}/records"
             # new_total_count = existing_record["totalCount"] + count
             new_total_count = count
+            # 计算canBeClaimed：剩余可领取数量
+            can_be_claimed = new_total_count - existing_record["getedCount"]
             update_result = updateRecord(
                 remainTableUrl, 
                 game_id, 
                 game_info["game_name"], 
                 new_total_count, 
                 existing_record["getedCount"], 
+                can_be_claimed,
                 existing_record["id"]
             )
             

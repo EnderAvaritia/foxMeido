@@ -38,7 +38,7 @@ CREATE TABLE remain (
     gameName VARCHAR(255),
     totalCount INTEGER,
     getedCount INTEGER,
-    canBeClaimed_1 VARCHAR(255)
+    canBeClaimed INTEGER
 );
 CREATE TABLE wishlist (
     id INTEGER PRIMARY KEY ,

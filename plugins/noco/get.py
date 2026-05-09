@@ -76,7 +76,7 @@ def updateRecord (url, recordId, gameId, gameName, totalCount, getedCount, canBe
     "gameName": gameName,
     "totalCount": totalCount,
     "getedCount": getedCount,
-    "canBeClaimed_1": canBeClaimed
+    "canBeClaimed": canBeClaimed
     }
     headers = {
     'Content-Type': "application/json",
@@ -250,7 +250,7 @@ async def handle_function(event: MessageEvent, args: Message = CommandArg()):
         await get.finish(f"登记阶段出现未知错误，请反馈")
     else:
         remainTableUrl = f"{nocoUrl}/{remainTableId}/records"
-        canBeClaimed = bool(remainGameRecord["totalCount"] - remainGameRecord["getedCount"] - 1)
+        canBeClaimed = remainGameRecord["totalCount"] - remainGameRecord["getedCount"] - 1
         remain = updateRecord (remainTableUrl, remainGameRecord["id"], goodId, gameInfo["game_name"], remainGameRecord["totalCount"], remainGameRecord["getedCount"] + 1, canBeClaimed)
         if "id" in remain :
             await get.finish(f'用户ID {userId} (昵称: {accountRecord["nickname"]})\n对游戏ID {goodId}《{gameInfo["game_name"]}》\n成功登记为第{recordResult["id"]}个结果\n游戏剩余{remainGameRecord["totalCount"] - remainGameRecord["getedCount"] - 1}个')
