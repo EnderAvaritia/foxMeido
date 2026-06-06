@@ -13,8 +13,8 @@ import requests
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
-from noco.noco_config import HTTP_PROXY, PROXIES
-from noco.error_logger import log_error
+from plugins.noco.noco_config import HTTP_PROXY, PROXIES
+from plugins.noco.error_logger import log_error
 
 finder = on_command("finder", rule=to_me(), aliases={"finder"}, priority=10, block=True)
 

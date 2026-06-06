@@ -6,9 +6,9 @@ from nonebot import require
 # from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 from nonebot.rule import to_me
 
-from noco.noco_config import HTTP_PROXY
-from noco.playwright_utils import create_browser_page
-from noco.error_logger import log_error
+from plugins.noco.noco_config import HTTP_PROXY
+from plugins.noco.playwright_utils import create_browser_page
+from plugins.noco.error_logger import log_error
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_alconna import Alconna, Args, Match, UniMessage, on_alconna  # noqa: E402

@@ -13,7 +13,7 @@ import requests
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
-from noco.error_logger import log_error
+from plugins.noco.error_logger import log_error
 
 dota = on_command("dota", rule=to_me(), aliases={"dota"}, priority=10, block=True)
 

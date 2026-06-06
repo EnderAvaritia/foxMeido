@@ -16,9 +16,9 @@ from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 from nonebot import on_startswith
 
-from noco.noco_config import PROXIES
-from noco.playwright_utils import create_browser_page
-from noco.error_logger import log_error
+from plugins.noco.noco_config import PROXIES
+from plugins.noco.playwright_utils import create_browser_page
+from plugins.noco.error_logger import log_error
 
 browser = None
 page = None
