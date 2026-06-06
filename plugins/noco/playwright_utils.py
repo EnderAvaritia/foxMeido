@@ -29,7 +29,11 @@ async def create_browser_page(
     """
     playwright = await async_playwright().start()
     browser = await playwright.chromium.launch(headless=True)
-    context = await browser.new_context(proxy={"server": HTTP_PROXY})
+    # 仅当配置了代理时才传递 proxy 参数
+    ctx_kwargs = {}
+    if HTTP_PROXY:
+        ctx_kwargs["proxy"] = {"server": HTTP_PROXY}
+    context = await browser.new_context(**ctx_kwargs)
     await context.add_cookies(cookies=[])
     page = await context.new_page()
     if viewport_size:

@@ -12,10 +12,10 @@ noco_config.py - NocoDB 配置中心
   NOCO_REMAIN_TABLE    - remain 表格 ID (必填)
   NOCO_WISHLIST_TABLE  - wishlist 表格 ID (必填)
   NOCO_VERIFY_SSL      - 是否验证 SSL (true/false, 默认 false)
-                         ⚠ 国内自建 NocoDB 多为自签名证书，默认 false。
-                           如果使用公共 CA 证书的 HTTPS，可设为 true。
-  HTTP_PROXY           - HTTP 代理地址 (http://127.0.0.1:7890)
-  HTTPS_PROXY          - HTTPS 代理地址 (http://127.0.0.1:7890)
+                          ⚠ 国内自建 NocoDB 多为自签名证书，默认 false。
+                            如果使用公共 CA 证书的 HTTPS，可设为 true。
+  HTTP_PROXY           - HTTP 代理地址（默认空 = 不使用代理）
+  HTTPS_PROXY          - HTTPS 代理地址（默认空 = 跟随 HTTP_PROXY）
   STEAM_COOKIE         - Steam 登录 Cookie（wish 用）
   CURATOR_ID           - Steam 鉴赏家 ID（unreported 用）
 """
@@ -45,9 +45,25 @@ HEADERS: dict[str, str] = {"xc-token": NOCO_TOKEN}
 VERIFY_SSL: bool = _env_bool("NOCO_VERIFY_SSL", "false")
 
 # ── 代理 ─────────────────────────────────────────────────────
-HTTP_PROXY: str = os.getenv("HTTP_PROXY", "http://127.0.0.1:7890")
-HTTPS_PROXY: str = os.getenv("HTTPS_PROXY", "http://127.0.0.1:7890")
-PROXIES: dict[str, str] = {"http": HTTP_PROXY, "https": HTTPS_PROXY}
+# 不设置 HTTP_PROXY 即不使用代理。Playwright 只支持单 server 参数，
+# 因此只读 HTTP_PROXY，HTTPS_PROXY 自动跟随。
+_http_proxy: str = os.getenv("HTTP_PROXY", "")
+_https_proxy: str = os.getenv("HTTPS_PROXY", "")
+
+# 同步：如果只设了一个，另一个沿用同一值
+if _http_proxy and not _https_proxy:
+    _https_proxy = _http_proxy
+elif _https_proxy and not _http_proxy:
+    _http_proxy = _https_proxy
+
+HTTP_PROXY: str = _http_proxy
+HTTPS_PROXY: str = _https_proxy
+
+# PROXIES 仅包含非空条目，传给 requests.get(proxies=PROXIES) 时自动生效/跳过
+PROXIES: dict[str, str] = {}
+if HTTP_PROXY:
+    PROXIES["http"] = HTTP_PROXY
+    PROXIES["https"] = HTTPS_PROXY
 
 # ── Steam ────────────────────────────────────────────────────
 STEAM_COOKIE: str = os.getenv("STEAM_COOKIE", "")

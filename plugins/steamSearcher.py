@@ -77,7 +77,10 @@ async def get_message(name):
     )
     print(url)
 
-    async with httpx.AsyncClient(proxy=proxy_url) as client:
+    client_kwargs = {}
+    if proxy_url:
+        client_kwargs["proxy"] = proxy_url
+    async with httpx.AsyncClient(**client_kwargs) as client:
         response = await client.get(url, headers=headers)
         if response.status_code != 200:
             print("请求失败")

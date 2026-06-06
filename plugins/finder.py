@@ -60,12 +60,12 @@ async def fetch_title(url: str) -> str:
 async def take_screenshot(url: str):
     async with async_playwright() as p:
         print("p")
-        proxy = {
-        "server": HTTP_PROXY
-        }
+        ctx_kwargs = {}
+        if HTTP_PROXY:
+            ctx_kwargs["proxy"] = {"server": HTTP_PROXY}
         
         browser = await p.chromium.launch(headless=False, slow_mo=1000)
-        context = await browser.new_context(proxy=proxy)
+        context = await browser.new_context(**ctx_kwargs)
         page = await context.new_page()
         print("new")
         await page.goto(url)

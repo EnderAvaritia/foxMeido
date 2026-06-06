@@ -10,8 +10,6 @@ import requests
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
-from noco.noco_config import HTTP_PROXY
-
 dota = on_command("dota", rule=to_me(), aliases={"dota"}, priority=10, block=True)
 
 @dota.handle()
@@ -39,13 +37,8 @@ async def take_screenshot(args: str):
     async with async_playwright() as p:
         
         print(args)
-        
-        proxy = {
-        "server": HTTP_PROXY
-        }
-                       
+
         browser = await p.chromium.launch(headless=True)
-        # context = await browser.new_context(proxy=proxy)
         context = await browser.new_context()
         page = await context.new_page()
         await page.set_viewport_size(({"width": 800, "height": 19200}))
