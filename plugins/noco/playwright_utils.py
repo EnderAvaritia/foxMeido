@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from playwright.async_api import async_playwright
 
-from .noco_config import HTTP_PROXY
+from .noco_config import get_http_proxy
 from .error_logger import log_error
 
 
@@ -33,8 +33,9 @@ async def create_browser_page(
         browser = await playwright.chromium.launch(headless=True)
         # 仅当配置了代理时才传递 proxy 参数
         ctx_kwargs = {}
-        if HTTP_PROXY:
-            ctx_kwargs["proxy"] = {"server": HTTP_PROXY}
+    proxy = get_http_proxy()
+    if proxy:
+        ctx_kwargs["proxy"] = {"server": proxy}
         context = await browser.new_context(**ctx_kwargs)
         await context.add_cookies(cookies=[])
         page = await context.new_page()

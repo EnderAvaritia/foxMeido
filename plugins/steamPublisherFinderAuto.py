@@ -15,7 +15,7 @@ from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 from nonebot import on_startswith
 
-from plugins.noco.noco_config import PROXIES
+from plugins.noco.noco_config import get_proxies
 from plugins.noco.playwright_utils import create_browser_page
 from plugins.noco.error_logger import log_error
 
@@ -72,7 +72,7 @@ async def get_message(publisher):
 
 async def fetch_title(url: str) -> str:
     try:
-        response = requests.get(url, proxies=PROXIES)
+        response = requests.get(url, proxies=get_proxies())
         response.raise_for_status()
 
         soup = BeautifulSoup(response.content, "html.parser")

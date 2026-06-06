@@ -6,7 +6,7 @@ from nonebot import require
 # from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 from nonebot.rule import to_me
 
-from plugins.noco.noco_config import HTTP_PROXY
+from plugins.noco.noco_config import get_http_proxy
 from plugins.noco.playwright_utils import create_browser_page
 from plugins.noco.error_logger import log_error
 
@@ -69,7 +69,7 @@ async def get_message(name):
     }
     #添加cookies
     
-    proxy_url = HTTP_PROXY
+    proxy_url = get_http_proxy()
 
     url = (
         "https://store.steampowered.com/search/?term="

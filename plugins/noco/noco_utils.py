@@ -11,7 +11,7 @@ from typing import Any
 
 import requests
 
-from .noco_config import PROXIES, request_kwargs, post_kwargs
+from .noco_config import get_proxies, request_kwargs, post_kwargs
 from .error_logger import log_error
 
 # ── 通用 NocoDB 操作 ───────────────────────────────────────
@@ -126,7 +126,7 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
     api_url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=schinese"
 
     try:
-        response = requests.get(api_url, proxies=PROXIES, timeout=10)
+        response = requests.get(api_url, proxies=get_proxies(), timeout=10)
         response.raise_for_status()
         data = response.json()
         app_data = data.get(str(appid))

@@ -13,7 +13,7 @@ import requests
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
-from plugins.noco.noco_config import HTTP_PROXY, PROXIES
+from plugins.noco.noco_config import get_proxies, get_http_proxy
 from plugins.noco.error_logger import log_error
 
 finder = on_command("finder", rule=to_me(), aliases={"finder"}, priority=10, block=True)
@@ -45,7 +45,7 @@ async def handle_function(args: Message = CommandArg()):
 async def fetch_title(url: str) -> str:
     try:
         # 发送HTTP GET请求
-        response = requests.get(url, proxies=PROXIES)
+        response = requests.get(url, proxies=get_proxies())
         response.raise_for_status()
         print(response.status_code)
 
@@ -66,8 +66,9 @@ async def take_screenshot(url: str):
         print("p")
         try:
             ctx_kwargs = {}
-            if HTTP_PROXY:
-                ctx_kwargs["proxy"] = {"server": HTTP_PROXY}
+        proxy = get_http_proxy()
+        if proxy:
+            ctx_kwargs["proxy"] = {"server": proxy}
             
             browser = await p.chromium.launch(headless=False, slow_mo=1000)
             context = await browser.new_context(**ctx_kwargs)

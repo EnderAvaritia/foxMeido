@@ -17,7 +17,7 @@ from nonebot.rule import to_me
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
-from plugins.noco.noco_config import PROXIES
+from plugins.noco.noco_config import get_proxies
 from plugins.noco.playwright_utils import create_browser_page
 from plugins.noco.error_logger import log_error
 
@@ -145,7 +145,7 @@ async def getGameInfo(appid: int):
     api_url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=schinese"
     print(f"正在请求API接口: {api_url}")
     try:
-        response = requests.get(api_url, proxies=PROXIES)
+        response = requests.get(api_url, proxies=get_proxies())
         response.raise_for_status()  # 检查HTTP状态码，如果不是200则抛出异常
 
         data = response.json()

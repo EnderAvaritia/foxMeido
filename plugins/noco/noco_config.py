@@ -44,22 +44,48 @@ WISHLIST_TABLE_ID: str = os.getenv("NOCO_WISHLIST_TABLE", "")
 HEADERS: dict[str, str] = {"xc-token": NOCO_TOKEN}
 VERIFY_SSL: bool = _env_bool("NOCO_VERIFY_SSL", "false")
 
-# ── 代理 ─────────────────────────────────────────────────────
-# 不设置 HTTP_PROXY 即不使用代理。Playwright 只支持单 server 参数，
-# 因此只读 HTTP_PROXY，HTTPS_PROXY 自动跟随。
-_http_proxy: str = os.getenv("HTTP_PROXY", "")
-_https_proxy: str = os.getenv("HTTPS_PROXY", "")
+# ── 代理（懒加载函数）────────────────────────────────────────
+# 注意：os.getenv() 在模块导入时执行，但 python-dotenv 可能尚未加载 .env。
+# 使用 get_proxies() / get_http_proxy() 在调用时实时读取，确保值正确。
 
-# 同步：如果只设了一个，另一个沿用同一值
-if _http_proxy and not _https_proxy:
-    _https_proxy = _http_proxy
-elif _https_proxy and not _http_proxy:
-    _http_proxy = _https_proxy
 
-HTTP_PROXY: str = _http_proxy
-HTTPS_PROXY: str = _https_proxy
+def get_http_proxy() -> str:
+    """获取 HTTP 代理地址（Playwright 用）。每次调用时从环境变量读取。"""
+    http_proxy = os.getenv("HTTP_PROXY", "")
+    https_proxy = os.getenv("HTTPS_PROXY", "")
+    # 同步：如果只设了一个，另一个沿用同一值
+    if http_proxy and not https_proxy:
+        https_proxy = http_proxy
+    elif https_proxy and not http_proxy:
+        http_proxy = https_proxy
+    return http_proxy
 
-# PROXIES 仅包含非空条目，传给 requests.get(proxies=PROXIES) 时自动生效/跳过
+
+def get_proxies() -> dict[str, str]:
+    """获取代理配置字典（requests 用）。每次调用时从环境变量读取。"""
+    http_proxy = os.getenv("HTTP_PROXY", "")
+    https_proxy = os.getenv("HTTPS_PROXY", "")
+    if http_proxy and not https_proxy:
+        https_proxy = http_proxy
+    elif https_proxy and not http_proxy:
+        http_proxy = https_proxy
+    proxies: dict[str, str] = {}
+    if http_proxy:
+        proxies["http"] = http_proxy
+        proxies["https"] = https_proxy
+    return proxies
+
+
+# ── 模块级常量（兼容旧代码，但优先使用上面的函数）───────────
+# 注意：这些在模块导入时求值，如果 dotenv 尚未加载则可能为空。
+HTTP_PROXY: str = os.getenv("HTTP_PROXY", "")
+HTTPS_PROXY: str = os.getenv("HTTPS_PROXY", "")
+# 同步
+if HTTP_PROXY and not HTTPS_PROXY:
+    HTTPS_PROXY = HTTP_PROXY
+elif HTTPS_PROXY and not HTTP_PROXY:
+    HTTP_PROXY = HTTPS_PROXY
+
 PROXIES: dict[str, str] = {}
 if HTTP_PROXY:
     PROXIES["http"] = HTTP_PROXY
