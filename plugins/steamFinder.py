@@ -1,5 +1,6 @@
 import json
 import re
+import base64
 
 import requests
 from bs4 import BeautifulSoup
@@ -7,7 +8,10 @@ from nonebot import on_command
 from nonebot.adapters import Message
 
 # from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
-from nonebot.adapters.qq import MessageSegment
+try:
+    from nonebot.adapters.qq import MessageSegment
+except ImportError:
+    from nonebot.adapters.onebot.v11 import MessageSegment
 from nonebot.params import CommandArg
 from nonebot.rule import to_me
 from playwright.async_api import Error as PlaywrightError
@@ -90,7 +94,7 @@ async def get_message(goodId):
         price_format = ''
     
     if pic_data:
-        pic = MessageSegment.image(pic_data)
+        pic = MessageSegment.image(f"base64://{base64.b64encode(pic_data).decode()}")
     else:
         pic = '截图超时，请联系'
         

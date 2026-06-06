@@ -1,5 +1,6 @@
 import json
 import re
+import base64
 
 import requests
 from bs4 import BeautifulSoup
@@ -91,7 +92,7 @@ async def get_message(goodId):
         price_format = ''
     
     if pic_data:
-        pic = MessageSegment.image(pic_data)
+        pic = MessageSegment.image(f"base64://{base64.b64encode(pic_data).decode()}")
     else:
         pic = '截图超时，请联系'
         

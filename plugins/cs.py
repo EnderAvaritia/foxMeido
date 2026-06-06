@@ -3,7 +3,10 @@ from nonebot.rule import to_me
 from nonebot.adapters import Message
 from nonebot.params import CommandArg
 # from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
-from nonebot.adapters.qq import MessageSegment
+try:
+    from nonebot.adapters.qq import MessageSegment
+except ImportError:
+    from nonebot.adapters.onebot.v11 import MessageSegment
 
 import base64
 import requests
@@ -30,7 +33,7 @@ async def handle_function(messages: Message = CommandArg()):
     pic_data = await take_screenshot(args)
     
     if pic_data:
-        pic = MessageSegment.file_image(pic_data)
+        pic = MessageSegment.image(f"base64://{base64.b64encode(pic_data).decode()}")
         await cs.send(pic)
     else:
         await cs.send("检查你发了什么")

@@ -1,4 +1,5 @@
 import re
+import base64
 
 import requests
 from bs4 import BeautifulSoup
@@ -65,7 +66,7 @@ async def get_message(publisher):
     else:
         pic_data = await take_screenshot(url)
         if pic_data:
-            pic = MessageSegment.image(pic_data)
+            pic = MessageSegment.image(f"base64://{base64.b64encode(pic_data).decode()}")
             return title + pic
 
 

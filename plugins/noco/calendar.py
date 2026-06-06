@@ -1,4 +1,5 @@
 import re
+import base64
 
 import requests
 from bs4 import BeautifulSoup
@@ -44,7 +45,7 @@ async def handle_function(args: Message = CommandArg()):
     pic_data = await take_screenshot()
         
     if pic_data:
-        pic = MessageSegment.image(pic_data)
+        pic = MessageSegment.image(f"base64://{base64.b64encode(pic_data).decode()}")
     else:
         pic = '截图超时，请联系'
     
