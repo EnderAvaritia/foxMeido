@@ -143,7 +143,7 @@ async def getGameInfo(appid: int):
     api_url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=schinese"
     print(f"正在请求API接口: {api_url}")
     try:
-        response = requests.get(api_url, proxies=get_proxies())
+        response = requests.get(api_url, proxies=get_proxies(), headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}, timeout=15)
         response.raise_for_status()  # 检查HTTP状态码，如果不是200则抛出异常
 
         data = response.json()
