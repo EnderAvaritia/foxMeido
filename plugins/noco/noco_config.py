@@ -12,6 +12,8 @@ noco_config.py - NocoDB 配置中心
   NOCO_REMAIN_TABLE    - remain 表格 ID (必填)
   NOCO_WISHLIST_TABLE  - wishlist 表格 ID (必填)
   NOCO_VERIFY_SSL      - 是否验证 SSL (true/false, 默认 false)
+                         ⚠ 国内自建 NocoDB 多为自签名证书，默认 false。
+                           如果使用公共 CA 证书的 HTTPS，可设为 true。
   HTTP_PROXY           - HTTP 代理地址 (http://127.0.0.1:7890)
   HTTPS_PROXY          - HTTPS 代理地址 (http://127.0.0.1:7890)
   STEAM_COOKIE         - Steam 登录 Cookie（wish 用）

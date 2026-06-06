@@ -9,9 +9,11 @@ from nonebot.adapters import Message
 from nonebot.adapters.qq import MessageSegment
 from nonebot.params import CommandArg
 from nonebot.rule import to_me
-from playwright.async_api import async_playwright
-from playwright.async_api import Error as PWError
+from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeout
+
+from noco.noco_config import PROXIES
+from noco.playwright_utils import create_browser_page
 
 browser = None
 page = None
@@ -20,13 +22,7 @@ page = None
 async def init_playwright():
     global browser, page
     if browser is None:
-        playwright = await async_playwright().start()
-        browser = await playwright.chromium.launch(headless=True)
-        cookies: list = []
-        context = await browser.new_context(proxy={"server": "http://127.0.0.1:7890"})
-        await context.add_cookies(cookies=cookies)
-        page = await context.new_page()
-        await page.set_viewport_size(({"width": 800, "height": 19200}))
+        browser, page = await create_browser_page(viewport_size={"width": 800, "height": 19200})
 
 
 steamPublishers = on_command("steamPublishers", rule=to_me(), aliases={"pub"}, priority=10, block=True)
@@ -71,9 +67,8 @@ async def get_message(publisher):
 
 
 async def fetch_title(url: str) -> str:
-    proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
     try:
-        response = requests.get(url, proxies=proxies)
+        response = requests.get(url, proxies=PROXIES)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.content, "html.parser")
@@ -114,7 +109,7 @@ async def take_screenshot(url: str):
             print("截图超时，30 秒内元素未出现")
             screenshot_bytes = None
         except PlaywrightError as e:
-            print("页面打开失败:", e.message)
+            print("页面打开失败:", e.message if hasattr(e, 'message') else str(e))
             screenshot_bytes = None
 
         # print(type(screenshot_bytes))

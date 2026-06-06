@@ -1,3 +1,4 @@
+import json
 import re
 
 import requests
@@ -9,11 +10,11 @@ from nonebot.adapters import Message
 from nonebot.adapters.qq import MessageSegment
 from nonebot.params import CommandArg
 from nonebot.rule import to_me
-from playwright.async_api import async_playwright
-from playwright.async_api import Error as PWError
+from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
-								 
+from noco.noco_config import PROXIES
+from noco.playwright_utils import create_browser_page
 
 browser = None
 page = None
@@ -22,13 +23,7 @@ page = None
 async def init_playwright():
     global browser, page
     if browser is None:
-        playwright = await async_playwright().start()
-        browser = await playwright.chromium.launch(headless=True)
-																	
-        cookies: list = []
-        context = await browser.new_context(proxy={"server": "http://127.0.0.1:7890"})
-        await context.add_cookies(cookies=cookies)
-        page = await context.new_page()
+        browser, page = await create_browser_page()
 
 
 steamGoods = on_command("steamGoods", rule=to_me(), aliases={"steam", "查商店", "id"}, priority=10, block=True)
@@ -140,10 +135,8 @@ async def getGameInfo(appid: int):
     # --- 通过Steam Web API 获取游戏名称和厂商名 ---
     api_url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=schinese"
     print(f"正在请求API接口: {api_url}")
-    proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
-
     try:
-        response = requests.get(api_url, proxies=proxies)
+        response = requests.get(api_url, proxies=PROXIES)
         response.raise_for_status()  # 检查HTTP状态码，如果不是200则抛出异常
 
         data = response.json()
@@ -270,7 +263,7 @@ async def take_screenshot(appid: str):
             print("截图超时，30 秒内元素未出现")
             screenshot_bytes = None
         except PlaywrightError as e:
-            print("页面打开失败:", e.message)
+            print("页面打开失败:", e.message if hasattr(e, 'message') else str(e))
             screenshot_bytes = None
 
         # print(type(screenshot_bytes))

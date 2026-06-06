@@ -5,7 +5,9 @@ from nonebot import require
 
 # from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 from nonebot.rule import to_me
-from playwright.async_api import async_playwright
+
+from noco.noco_config import HTTP_PROXY
+from noco.playwright_utils import create_browser_page
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_alconna import Alconna, Args, Match, UniMessage, on_alconna  # noqa: E402
@@ -16,14 +18,7 @@ page = None
 async def init_playwright():
     global browser, page
     if browser is None:
-        playwright = await async_playwright().start()
-        browser = await playwright.chromium.launch(headless=True)
-        # browser = await playwright.chromium.launch(headless=False, slow_mo=1000)
-
-        cookies: list = []
-        context = await browser.new_context(proxy={"server": "http://127.0.0.1:7890"})
-        await context.add_cookies(cookies=cookies)
-        page = await context.new_page()
+        browser, page = await create_browser_page()
 
 
 steam_searcher = on_alconna(
@@ -73,7 +68,7 @@ async def get_message(name):
     }
     #添加cookies
     
-    proxy_url = "http://localhost:7890"
+    proxy_url = HTTP_PROXY
 
     url = (
         "https://store.steampowered.com/search/?term="

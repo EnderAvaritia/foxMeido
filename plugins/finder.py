@@ -10,6 +10,8 @@ import requests
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
+from noco.noco_config import HTTP_PROXY, PROXIES
+
 finder = on_command("finder", rule=to_me(), aliases={"finder"}, priority=10, block=True)
 
 @finder.handle()
@@ -37,13 +39,9 @@ async def handle_function(args: Message = CommandArg()):
     await finder.send(pic)
     
 async def fetch_title(url: str) -> str:
-    proxies = {
-    "http": "http://127.0.0.1:7890", 
-    "https": "http://127.0.0.1:7890"
-    }
     try:
         # 发送HTTP GET请求
-        response = requests.get(url, proxies=proxies)
+        response = requests.get(url, proxies=PROXIES)
         response.raise_for_status()
         print(response.status_code)
 
@@ -63,7 +61,7 @@ async def take_screenshot(url: str):
     async with async_playwright() as p:
         print("p")
         proxy = {
-        "server": "http://127.0.0.1:7890"
+        "server": HTTP_PROXY
         }
         
         browser = await p.chromium.launch(headless=False, slow_mo=1000)
