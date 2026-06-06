@@ -12,6 +12,7 @@ from typing import Any
 import requests
 
 from .noco_config import PROXIES, request_kwargs, post_kwargs
+from .error_logger import log_error
 
 # ── 通用 NocoDB 操作 ───────────────────────────────────────
 
@@ -34,10 +35,13 @@ def get_record(url: str) -> dict[str, Any] | str:
             return data["list"][0]
         return ""
     except requests.exceptions.RequestException as e:
+        log_error("noco_utils.get_record", f"请求失败: {e}")
         return {"error": f"请求失败: {e}"}
     except json.JSONDecodeError as e:
+        log_error("noco_utils.get_record", f"JSON解析失败: {e}")
         return {"error": f"JSON解析失败: {e}"}
     except Exception as e:
+        log_error("noco_utils.get_record", f"未知错误: {e}")
         return {"error": f"未知错误: {e}"}
 
 
@@ -52,10 +56,13 @@ def get_records(url: str) -> dict[str, Any]:
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
+        log_error("noco_utils.get_records", f"请求失败: {e}")
         return {"error": f"请求失败: {e}"}
     except json.JSONDecodeError as e:
+        log_error("noco_utils.get_records", f"JSON解析失败: {e}")
         return {"error": f"JSON解析失败: {e}"}
     except Exception as e:
+        log_error("noco_utils.get_records", f"未知错误: {e}")
         return {"error": f"未知错误: {e}"}
 
 
@@ -68,10 +75,13 @@ def create_record(url: str, payload: dict[str, Any]) -> dict[str, Any]:
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
+        log_error("noco_utils.create_record", f"请求失败: {e}")
         return {"error": f"请求失败: {e}"}
     except json.JSONDecodeError as e:
+        log_error("noco_utils.create_record", f"JSON解析失败: {e}")
         return {"error": f"JSON解析失败: {e}"}
     except Exception as e:
+        log_error("noco_utils.create_record", f"未知错误: {e}")
         return {"error": f"未知错误: {e}"}
 
 
@@ -84,10 +94,13 @@ def update_record(url: str, payload: dict[str, Any]) -> dict[str, Any]:
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
+        log_error("noco_utils.update_record", f"请求失败: {e}")
         return {"error": f"请求失败: {e}"}
     except json.JSONDecodeError as e:
+        log_error("noco_utils.update_record", f"JSON解析失败: {e}")
         return {"error": f"JSON解析失败: {e}"}
     except Exception as e:
+        log_error("noco_utils.update_record", f"未知错误: {e}")
         return {"error": f"未知错误: {e}"}
 
 
@@ -145,10 +158,13 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
             )
     except requests.exceptions.RequestException as e:
         errors.append(f"请求API接口时发生网络错误或HTTP错误: {e}")
+        log_error("noco_utils.get_game_info", f"请求API异常: {e}")
     except json.JSONDecodeError as e:
         errors.append(f"解析API响应JSON时发生错误: {e}")
+        log_error("noco_utils.get_game_info", f"JSON解析异常: {e}")
     except Exception as e:
         errors.append(f"处理API响应时发生未知错误: {e}")
+        log_error("noco_utils.get_game_info", f"未知异常: {e}")
 
     result: dict[str, Any] = {
         "game_name": game_name,

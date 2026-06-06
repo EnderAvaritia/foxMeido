@@ -10,6 +10,8 @@ import requests
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
+from noco.error_logger import log_error
+
 cs = on_command("cs", rule=to_me(), aliases={"cs"}, priority=10, block=True)
 
 @cs.handle()
@@ -38,27 +40,30 @@ async def take_screenshot(args: str):
         
         print(args)
 
-        browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context()
-        page = await context.new_page()
-        await page.set_viewport_size(({"width": 800, "height": 19200}))
+        try:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context()
+            page = await context.new_page()
+            await page.set_viewport_size(({"width": 800, "height": 19200}))
 
-        print("new")
-        
-        min_price = args[0]
-        min_volume = args[1]
-        
-        url = f"https://www.iflow.work/?page_num=1&platforms=buff-igxe-uuyp-eco-c5&games=csgo&sort_by=sell&min_price={min_price}&max_price=5000&min_volume={min_volume}&max_latency=0&price_mode=buy"
+            print("new")
+            
+            min_price = args[0]
+            min_volume = args[1]
+            
+            url = f"https://www.iflow.work/?page_num=1&platforms=buff-igxe-uuyp-eco-c5&games=csgo&sort_by=sell&min_price={min_price}&max_price=5000&min_volume={min_volume}&max_latency=0&price_mode=buy"
 
-        await page.goto(url)
-        print("goto")
+            await page.goto(url)
+            print("goto")
 
-        print("screenshot_bytes")
-        screenshot_bytes = await page.locator('xpath=//div[@class="ant-spin-container"]/div[@class="ant-row css-wfimbv"]').screenshot()
-        
-        print(type(screenshot_bytes))
-        
-        await browser.close()
-        
-        base64_data = base64.b64encode(screenshot_bytes).decode('utf-8')
-        return screenshot_bytes
+            print("screenshot_bytes")
+            screenshot_bytes = await page.locator('xpath=//div[@class="ant-spin-container"]/div[@class="ant-row css-wfimbv"]').screenshot()
+            
+            print(type(screenshot_bytes))
+            
+            await browser.close()
+            
+            return screenshot_bytes
+        except Exception as e:
+            log_error("cs.take_screenshot", f"截图异常: {e}")
+            return None

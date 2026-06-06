@@ -10,6 +10,7 @@ from __future__ import annotations
 from playwright.async_api import async_playwright
 
 from .noco_config import HTTP_PROXY
+from .error_logger import log_error
 
 
 async def create_browser_page(
@@ -41,5 +42,5 @@ async def create_browser_page(
             await page.set_viewport_size(viewport_size)
         return browser, page
     except Exception as e:
-        print(f"Playwright 初始化失败: {e}")
+        log_error("create_browser_page", f"Playwright 初始化失败: {e}")
         return None, None

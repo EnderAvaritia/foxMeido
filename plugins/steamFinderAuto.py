@@ -17,6 +17,7 @@ from nonebot import on_startswith
 
 from noco.noco_config import PROXIES
 from noco.playwright_utils import create_browser_page
+from noco.error_logger import log_error
 
 browser = None
 page = None
@@ -200,6 +201,7 @@ async def getGameInfo(appid: int):
                 
                 except Exception as e:
                     errors.append(f"处理API响应时发生未知错误: {e}")
+                    log_error("steamFinderAuto.getGameInfo", f"处理价格异常: {e}")
                     initial = 1
                     final = 1
                     currency = None
@@ -214,12 +216,15 @@ async def getGameInfo(appid: int):
 
     except requests.exceptions.RequestException as e:
         errors.append(f"请求API接口时发生网络错误或HTTP错误: {e}")
+        log_error("steamFinderAuto.getGameInfo", f"请求API异常: {e}")
         print(errors[-1])
     except json.JSONDecodeError as e:
         errors.append(f"解析API响应JSON时发生错误: {e}")
+        log_error("steamFinderAuto.getGameInfo", f"JSON解析异常: {e}")
         print(errors[-1])
     except Exception as e:
         errors.append(f"处理API响应时发生未知错误: {e}")
+        log_error("steamFinderAuto.getGameInfo", f"未知异常: {e}")
         print(errors[-1])
 
     result = {
@@ -242,22 +247,22 @@ async def take_screenshot(appid: str):
     try:
         await init_playwright()
     except Exception as e:
-        print(f"Playwright 初始化异常: {e}")
+        log_error("steamFinderAuto.take_screenshot", f"Playwright 初始化异常: {e}")
         return None
     print("new_browser")
     if not page:
-        print("Playwright初始化失败")
+        log_error("steamFinderAuto.take_screenshot", "Playwright初始化失败")
         return None
     try:
         await page.goto(url)
     except Exception as e:
-        print(f"页面跳转失败: {e}")
+        log_error("steamFinderAuto.take_screenshot", f"页面跳转失败: {e}")
         return None
     print("page_goto")
     try:
         title = await page.title()
         if title == "Welcome to Steam":
-            print("没这玩意，跳转了")
+            log_error("steamFinderAuto.take_screenshot", f"AppID {appid} 不存在（跳转至Welcome to Steam）")
             return None
         
         if await page.query_selector('//a[@id="view_product_page_btn"]'):
@@ -266,17 +271,18 @@ async def take_screenshot(appid: str):
             await page.select_option('//select[@name="ageYear"]', '1900')
             await page.click('//a[@id="view_product_page_btn"]')
     except Exception as e:
-        print(f"页面处理异常: {e}")
+        log_error("steamFinderAuto.take_screenshot", f"页面处理异常: {e}")
         return None
     
     print("screenshot_bytes")
     try:
         screenshot_bytes = await page.locator('xpath=//div[@class="glance_ctn"]').screenshot()
     except PlaywrightTimeout:
-        print("截图超时，30 秒内元素未出现")
+        log_error("steamFinderAuto.take_screenshot", "截图超时，30秒内元素未出现")
         screenshot_bytes = None
     except PlaywrightError as e:
-        print("页面打开失败:", e.message if hasattr(e, 'message') else str(e))
+        msg = e.message if hasattr(e, 'message') else str(e)
+        log_error("steamFinderAuto.take_screenshot", f"页面打开失败: {msg}")
         screenshot_bytes = None
 
     return screenshot_bytes

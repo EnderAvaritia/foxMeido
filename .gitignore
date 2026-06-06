@@ -1,0 +1,8 @@
+.venv
+/.env
+/token.txt
+/.gitignore
+/tmp
+/plugins/__pycache__
+/plugins/weather.py
+/logs/

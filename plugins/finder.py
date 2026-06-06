@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
 from noco.noco_config import HTTP_PROXY, PROXIES
+from noco.error_logger import log_error
 
 finder = on_command("finder", rule=to_me(), aliases={"finder"}, priority=10, block=True)
 
@@ -81,5 +82,5 @@ async def take_screenshot(url: str):
             
             return screenshot_bytes
         except Exception as e:
-            print(f"截图异常: {e}")
+            log_error("finder.take_screenshot", f"截图异常: {e}")
             return None

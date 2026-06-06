@@ -14,6 +14,7 @@ from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 from noco.noco_config import PROXIES
 from noco.playwright_utils import create_browser_page
+from noco.error_logger import log_error
 
 browser = None
 page = None
@@ -87,22 +88,22 @@ async def take_screenshot(url: str):
     try:
         await init_playwright()
     except Exception as e:
-        print(f"Playwright 初始化异常: {e}")
+        log_error("steamPublisherFinder.take_screenshot", f"Playwright 初始化异常: {e}")
         return None
     print("new_browser")
     if not page:
-        print("Playwright初始化失败")
+        log_error("steamPublisherFinder.take_screenshot", "Playwright初始化失败")
         return None
     try:
         await page.goto(url)
     except Exception as e:
-        print(f"页面跳转失败: {e}")
+        log_error("steamPublisherFinder.take_screenshot", f"页面跳转失败: {e}")
         return None
     print("page_goto")
     try:
         title = await page.title()
         if title == "Welcome to Steam":
-            print("没这玩意，跳转了")
+            log_error("steamPublisherFinder.take_screenshot", f"页面跳转至Welcome to Steam，URL可能无效: {url}")
             return None
         
         if await page.query_selector('//a[@id="view_product_page_btn"]'):
@@ -111,17 +112,18 @@ async def take_screenshot(url: str):
             await page.select_option('//select[@name="ageYear"]', '1900')
             await page.click('//a[@id="view_product_page_btn"]')
     except Exception as e:
-        print(f"页面处理异常: {e}")
+        log_error("steamPublisherFinder.take_screenshot", f"页面处理异常: {e}")
         return None
     
     print("screenshot_bytes")
     try:
         screenshot_bytes = await page.locator('xpath=//div[@id="RecommendationsRows"]').screenshot()
     except PlaywrightTimeout:
-        print("截图超时，30 秒内元素未出现")
+        log_error("steamPublisherFinder.take_screenshot", "截图超时，30秒内元素未出现")
         screenshot_bytes = None
     except PlaywrightError as e:
-        print("页面打开失败:", e.message if hasattr(e, 'message') else str(e))
+        msg = e.message if hasattr(e, 'message') else str(e)
+        log_error("steamPublisherFinder.take_screenshot", f"页面打开失败: {msg}")
         screenshot_bytes = None
 
     return screenshot_bytes

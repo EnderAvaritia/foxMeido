@@ -8,6 +8,7 @@ from nonebot.rule import to_me
 
 from noco.noco_config import HTTP_PROXY
 from noco.playwright_utils import create_browser_page
+from noco.error_logger import log_error
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_alconna import Alconna, Args, Match, UniMessage, on_alconna  # noqa: E402
@@ -129,10 +130,11 @@ async def get_choice(number: int):
     try:
         await init_playwright()
     except Exception as e:
-        print(f"Playwright 初始化异常: {e}")
+        log_error("steamSearcher.get_choice", f"Playwright 初始化异常: {e}")
         await steam_searcher.finish("Playwright初始化失败", at_sender=False)
         return
     if not page:
+        log_error("steamSearcher.get_choice", "Playwright初始化失败（page为None）")
         await steam_searcher.finish("Playwright初始化失败", at_sender=False)
         return
     try:
@@ -152,5 +154,5 @@ async def get_choice(number: int):
         else:
             await steam_searcher.finish("未能获取详情页面", at_sender=False)
     except Exception as e:
-        print(f"截图过程异常: {e}")
+        log_error("steamSearcher.get_choice", f"截图过程异常: {e}")
         await steam_searcher.finish("截图过程出错", at_sender=False)
