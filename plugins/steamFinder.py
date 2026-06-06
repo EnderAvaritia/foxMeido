@@ -135,6 +135,10 @@ async def getGameInfo(appid: int):
     game_name = None
     publisher = None # 默认为None
     release_date = None
+    supported_languages = None
+    initial = 1
+    final = 1
+    currency = None
     errors = []
 
     # --- 通过Steam Web API 获取游戏名称和厂商名 ---
