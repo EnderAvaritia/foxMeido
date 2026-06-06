@@ -5,11 +5,23 @@ help = on_command("help", rule=to_me())
 
 @help.handle()
 async def handle_function():
-    text = '''
-    命令使用/起始
-    使用id查找steam游戏，后面可接游戏id或者url，如：id 3251240
-    使用cs或者dota获取挂刀详情表，可带参数，依次是最低价格和日销量，如：dota 5 100
-    使用find查找steam游戏，交互式搜索，如：find 夫妻
-    使用pub查找发行商页面，如：pub publisher/MangoParty(前面的前缀自行补全)
-    '''
+    text = (
+        "📖 可用命令\n\n"
+        "id <游戏ID或商店链接>\n"
+        "  查游戏详情（名称、厂商、发行日期、价格、截图）\n"
+        "  例：id 3251240\n\n"
+        "pub <发行商名称>\n"
+        "  查发行商页面截图\n"
+        "  例：pub publisher/MangoParty\n\n"
+        "find <关键字>\n"
+        "  搜索 Steam 游戏，选编号看详情\n"
+        "  例：find 夫妻\n\n"
+        "cs [最低价] [日销量]\n"
+        "  CS2 挂刀行情表，可带参数\n"
+        "  例：cs 5 100\n\n"
+        "dota [最低价] [日销量]\n"
+        "  Dota2 挂刀行情表\n"
+        "  例：dota 5 100\n\n"
+        "💡 直接发 Steam 商店链接也会自动查详情"
+    )
     await help.finish(text)
