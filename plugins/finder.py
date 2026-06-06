@@ -66,9 +66,9 @@ async def take_screenshot(url: str):
         print("p")
         try:
             ctx_kwargs = {}
-        proxy = get_http_proxy()
-        if proxy:
-            ctx_kwargs["proxy"] = {"server": proxy}
+            proxy = get_http_proxy()
+            if proxy:
+                ctx_kwargs["proxy"] = {"server": proxy}
             
             browser = await p.chromium.launch(headless=False, slow_mo=1000)
             context = await browser.new_context(**ctx_kwargs)

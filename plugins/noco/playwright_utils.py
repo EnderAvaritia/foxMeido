@@ -33,9 +33,9 @@ async def create_browser_page(
         browser = await playwright.chromium.launch(headless=True)
         # 仅当配置了代理时才传递 proxy 参数
         ctx_kwargs = {}
-    proxy = get_http_proxy()
-    if proxy:
-        ctx_kwargs["proxy"] = {"server": proxy}
+        proxy = get_http_proxy()
+        if proxy:
+            ctx_kwargs["proxy"] = {"server": proxy}
         context = await browser.new_context(**ctx_kwargs)
         await context.add_cookies(cookies=[])
         page = await context.new_page()
