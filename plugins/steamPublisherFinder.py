@@ -84,36 +84,44 @@ async def fetch_title(url: str) -> str:
 
 async def take_screenshot(url: str):
     print("start_screenshot")
-    await init_playwright()
+    try:
+        await init_playwright()
+    except Exception as e:
+        print(f"Playwright 初始化异常: {e}")
+        return None
     print("new_browser")
-    if page:
+    if not page:
+        print("Playwright初始化失败")
+        return None
+    try:
         await page.goto(url)
-        print("page_goto")
-        title = page.title()
-        if await title == "Welcome to Steam":
+    except Exception as e:
+        print(f"页面跳转失败: {e}")
+        return None
+    print("page_goto")
+    try:
+        title = await page.title()
+        if title == "Welcome to Steam":
             print("没这玩意，跳转了")
-            return
+            return None
         
         if await page.query_selector('//a[@id="view_product_page_btn"]'):
             print("view_product_page_btn")
             await page.click('//select[@name="ageYear"]')
             await page.select_option('//select[@name="ageYear"]', '1900')
             await page.click('//a[@id="view_product_page_btn"]')
-        
-        print("screenshot_bytes")
+    except Exception as e:
+        print(f"页面处理异常: {e}")
+        return None
+    
+    print("screenshot_bytes")
+    try:
         screenshot_bytes = await page.locator('xpath=//div[@id="RecommendationsRows"]').screenshot()
-        try:
-            # 例如等待某个元素并截图
-            screenshot_bytes = await page.locator('xpath=//div[@class="glance_ctn"]').screenshot()
-        except PlaywrightTimeout:
-            print("截图超时，30 秒内元素未出现")
-            screenshot_bytes = None
-        except PlaywrightError as e:
-            print("页面打开失败:", e.message if hasattr(e, 'message') else str(e))
-            screenshot_bytes = None
+    except PlaywrightTimeout:
+        print("截图超时，30 秒内元素未出现")
+        screenshot_bytes = None
+    except PlaywrightError as e:
+        print("页面打开失败:", e.message if hasattr(e, 'message') else str(e))
+        screenshot_bytes = None
 
-        # print(type(screenshot_bytes))
-        # base64_data = base64.b64encode(screenshot_bytes).decode("utf-8")
-        return screenshot_bytes
-    else:
-        print("Playwright初始化失败")
+    return screenshot_bytes

@@ -60,23 +60,26 @@ async def fetch_title(url: str) -> str:
 async def take_screenshot(url: str):
     async with async_playwright() as p:
         print("p")
-        ctx_kwargs = {}
-        if HTTP_PROXY:
-            ctx_kwargs["proxy"] = {"server": HTTP_PROXY}
-        
-        browser = await p.chromium.launch(headless=False, slow_mo=1000)
-        context = await browser.new_context(**ctx_kwargs)
-        page = await context.new_page()
-        print("new")
-        await page.goto(url)
-        print("goto")
+        try:
+            ctx_kwargs = {}
+            if HTTP_PROXY:
+                ctx_kwargs["proxy"] = {"server": HTTP_PROXY}
+            
+            browser = await p.chromium.launch(headless=False, slow_mo=1000)
+            context = await browser.new_context(**ctx_kwargs)
+            page = await context.new_page()
+            print("new")
+            await page.goto(url)
+            print("goto")
 
-        print("screenshot_bytes")
-        screenshot_bytes = await page.screenshot()
-        
-        print(type(screenshot_bytes))
-        
-        await browser.close()
-        
-        base64_data = base64.b64encode(screenshot_bytes).decode('utf-8')
-        return screenshot_bytes
+            print("screenshot_bytes")
+            screenshot_bytes = await page.screenshot()
+            
+            print(type(screenshot_bytes))
+            
+            await browser.close()
+            
+            return screenshot_bytes
+        except Exception as e:
+            print(f"截图异常: {e}")
+            return None

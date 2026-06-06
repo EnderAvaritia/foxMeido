@@ -25,17 +25,21 @@ async def create_browser_page(
         viewport_size: 可选视口尺寸，例如 {"width": 800, "height": 19200}。
 
     Returns:
-        (browser, page) 元组。
+        (browser, page) 元组。失败时返回 (None, None)。
     """
-    playwright = await async_playwright().start()
-    browser = await playwright.chromium.launch(headless=True)
-    # 仅当配置了代理时才传递 proxy 参数
-    ctx_kwargs = {}
-    if HTTP_PROXY:
-        ctx_kwargs["proxy"] = {"server": HTTP_PROXY}
-    context = await browser.new_context(**ctx_kwargs)
-    await context.add_cookies(cookies=[])
-    page = await context.new_page()
-    if viewport_size:
-        await page.set_viewport_size(viewport_size)
-    return browser, page
+    try:
+        playwright = await async_playwright().start()
+        browser = await playwright.chromium.launch(headless=True)
+        # 仅当配置了代理时才传递 proxy 参数
+        ctx_kwargs = {}
+        if HTTP_PROXY:
+            ctx_kwargs["proxy"] = {"server": HTTP_PROXY}
+        context = await browser.new_context(**ctx_kwargs)
+        await context.add_cookies(cookies=[])
+        page = await context.new_page()
+        if viewport_size:
+            await page.set_viewport_size(viewport_size)
+        return browser, page
+    except Exception as e:
+        print(f"Playwright 初始化失败: {e}")
+        return None, None

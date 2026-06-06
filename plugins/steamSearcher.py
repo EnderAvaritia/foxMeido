@@ -126,22 +126,31 @@ async def get_choice(number: int):
         await steam_searcher.reject("无效的选择，请重试", at_sender=False)
         return
     link = game_links[number - 1]
-    await init_playwright()
+    try:
+        await init_playwright()
+    except Exception as e:
+        print(f"Playwright 初始化异常: {e}")
+        await steam_searcher.finish("Playwright初始化失败", at_sender=False)
+        return
     if not page:
         await steam_searcher.finish("Playwright初始化失败", at_sender=False)
         return
-    await page.goto(link)
-    await page.wait_for_timeout(2000)
-    # 处理年龄验证
-    if await page.query_selector('//a[@id="view_product_page_btn"]'):
-        await page.click('//select[@name="ageYear"]')
-        await page.select_option('//select[@name="ageYear"]', "1900")
-        await page.click('//a[@id="view_product_page_btn"]')
+    try:
+        await page.goto(link)
         await page.wait_for_timeout(2000)
-    # 截图详情
-    if await page.query_selector('xpath=//div[@class="glance_ctn"]'):
-        screenshot_bytes = await page.locator('xpath=//div[@class="glance_ctn"]').screenshot()
-        pic = UniMessage.image(raw=screenshot_bytes)
-        await steam_searcher.finish(message=pic, at_sender=False)
-    else:
-        await steam_searcher.finish("未能获取详情页面", at_sender=False)
+        # 处理年龄验证
+        if await page.query_selector('//a[@id="view_product_page_btn"]'):
+            await page.click('//select[@name="ageYear"]')
+            await page.select_option('//select[@name="ageYear"]', "1900")
+            await page.click('//a[@id="view_product_page_btn"]')
+            await page.wait_for_timeout(2000)
+        # 截图详情
+        if await page.query_selector('xpath=//div[@class="glance_ctn"]'):
+            screenshot_bytes = await page.locator('xpath=//div[@class="glance_ctn"]').screenshot()
+            pic = UniMessage.image(raw=screenshot_bytes)
+            await steam_searcher.finish(message=pic, at_sender=False)
+        else:
+            await steam_searcher.finish("未能获取详情页面", at_sender=False)
+    except Exception as e:
+        print(f"截图过程异常: {e}")
+        await steam_searcher.finish("截图过程出错", at_sender=False)
