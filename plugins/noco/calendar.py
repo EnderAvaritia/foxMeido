@@ -10,8 +10,10 @@ from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 from nonebot.params import CommandArg
 from nonebot.rule import to_me
 from playwright.async_api import async_playwright
-from playwright.async_api import Error as PWError
+from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeout
+
+from . import noco_config as cfg
 
 								 
 
@@ -27,7 +29,7 @@ async def init_playwright():
 																	
         cookies: list = []
         #playwright的cookie严格区分站点
-        context = await browser.new_context(proxy={"server": "http://127.0.0.1:7890"})
+        context = await browser.new_context(proxy={"server": cfg.HTTP_PROXY})
         await context.add_cookies(cookies=cookies)
         page = await context.new_page()
         # await page.set_viewport_size(({"width": 800, "height": 1920}))
