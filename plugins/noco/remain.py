@@ -29,6 +29,7 @@ import re
 
 from . import noco_config as cfg
 from . import noco_utils as utils
+from plugins.noco_utils import extract_steam_id, get_game_info
 
 remain = on_command("remain", aliases={"remain"}, priority=10, block=True)
 
@@ -59,7 +60,7 @@ async def handle_function(event: MessageEvent, args: Message = CommandArg()):
 
     # ── 有参数：解析 ──
     parts = arg_text.split()
-    game_id = utils.extract_steam_id(parts[0])
+    game_id = extract_steam_id(parts[0])
     if not game_id and re.match(r"^\d+$", parts[0]):
         game_id = parts[0]
     if not game_id:
@@ -81,7 +82,7 @@ async def handle_function(event: MessageEvent, args: Message = CommandArg()):
                 f"记录ID: {existing['id']}"
             )
         else:
-            info = utils.get_game_info(game_id)
+            info = get_game_info(game_id)
             name = info.get("game_name") or f"ID: {game_id}"
             await remain.finish(f"游戏《{name}》(ID: {game_id}) 尚未登记剩余份数")
 
@@ -94,7 +95,7 @@ async def handle_function(event: MessageEvent, args: Message = CommandArg()):
         except ValueError:
             await remain.finish("份数必须是整数")
 
-        info = utils.get_game_info(game_id)
+        info = get_game_info(game_id)
         if "error" in info:
             await remain.finish(f"游戏{game_id}数据获取出错：{info['error']}")
         if not info["game_name"]:

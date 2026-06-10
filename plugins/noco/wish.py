@@ -9,6 +9,7 @@ import json
 
 from . import noco_config as cfg
 from . import noco_utils as utils
+from plugins.noco_utils import extract_steam_id, get_game_info
 
 wish = on_command("wish", aliases={"wish"}, priority=10, block=True)
 
@@ -44,11 +45,11 @@ async def handle_function(event):
     userId = event.user_id
     nickname = event.sender.nickname
 
-    goodId = utils.extract_steam_id(str(event.message).strip())
+    goodId = extract_steam_id(str(event.message).strip())
     if not goodId:
         await wish.finish("你确定这是商品的id？")
 
-    gameInfo = utils.get_game_info(goodId)
+    gameInfo = get_game_info(goodId)
 
     if cfg.STEAM_COOKIE:
         result = add_to_wishlist(goodId, cfg.STEAM_COOKIE)

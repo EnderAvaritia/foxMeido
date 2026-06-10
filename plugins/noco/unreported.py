@@ -17,6 +17,7 @@ import re
 
 from . import noco_config as cfg
 from . import noco_utils as utils
+from plugins.noco_utils import extract_steam_id
 
 unreported = on_command("unreported", aliases={"unreported"}, priority=10, block=True)
 
@@ -60,7 +61,7 @@ async def handle_function(event: MessageEvent, args: Message = CommandArg()):
     game_id = None
 
     if arg_text:
-        game_id = utils.extract_steam_id(arg_text)
+        game_id = extract_steam_id(arg_text)
         if not game_id and re.match(r"^\d+$", arg_text):
             game_id = arg_text
         if not game_id:

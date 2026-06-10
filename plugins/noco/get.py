@@ -9,6 +9,7 @@ import re
 
 from . import noco_config as cfg
 from . import noco_utils as utils
+from plugins.noco_utils import extract_steam_id, get_game_info
 
 get = on_command("get", aliases={"get"}, priority=10, block=True)
 
@@ -35,10 +36,10 @@ async def handle_function(event: MessageEvent, args: Message = CommandArg()):
             "参数错误！用法：\n1. get <商品ID> - 为自己登记\n2. get <商品ID> <用户ID> - 为指定用户登记"
         )
 
-    goodId = utils.extract_steam_id(goodId_str)
+    goodId = extract_steam_id(goodId_str)
     if not goodId:
         await get.finish("你确定这是商品的id？")
-    gameInfo = utils.get_game_info(goodId)
+    gameInfo = get_game_info(goodId)
     if "error" in gameInfo:
         await get.finish(f"游戏{goodId}数据获取出错，请反馈")
 

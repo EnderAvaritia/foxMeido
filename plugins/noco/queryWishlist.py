@@ -7,6 +7,7 @@ import re
 
 from . import noco_config as cfg
 from . import noco_utils as utils
+from plugins.noco_utils import extract_steam_id
 
 queryWishlist = on_command("queryWishlist", aliases={"queryWishlist"}, priority=10, block=True)
 
@@ -36,7 +37,7 @@ async def handle_function(event: MessageEvent, args: Message = CommandArg()):
     if not input_text:
         await queryWishlist.finish("请输入游戏ID，格式: queryWishlist [gameId]")
 
-    game_id = utils.extract_steam_id(input_text) or input_text
+    game_id = extract_steam_id(input_text) or input_text
 
     url = cfg.url_with_filter(cfg.WISHLIST_TABLE_ID, f"(gameId,eq,{game_id})", sort="submitTime")
     records_data = utils.get_records(url)

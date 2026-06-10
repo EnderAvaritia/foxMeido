@@ -25,6 +25,7 @@ import re
 
 from . import noco_config as cfg
 from . import noco_utils as utils
+from plugins.noco_utils import extract_steam_id
 
 report = on_command("report", aliases={"report"}, priority=10, block=True)
 
@@ -57,7 +58,7 @@ async def handle_function(event: MessageEvent, args: Message = CommandArg()):
             "请输入游戏ID或Steam链接，格式：report 游戏ID"
         )
 
-    game_id = utils.extract_steam_id(arg_text)
+    game_id = extract_steam_id(arg_text)
     if not game_id and arg_text.isdigit():
         game_id = arg_text
     if not game_id:
