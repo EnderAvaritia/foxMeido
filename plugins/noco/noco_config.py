@@ -57,6 +57,7 @@ def _read_dotenv(key: str) -> str:
 
     # 兜底：直接读 .env 文件
     env_name = os.getenv("ENVIRONMENT", "")
+    print(f"[PROXY_DEBUG] _read_dotenv({key}) _PROJECT_ROOT={_PROJECT_ROOT!r} ENVIRONMENT={env_name!r}")
     candidates: list[str] = []
     if env_name:
         candidates.append(f".env.{env_name}")
@@ -64,11 +65,13 @@ def _read_dotenv(key: str) -> str:
 
     for fname in candidates:
         fpath = os.path.join(_PROJECT_ROOT, fname)
+        print(f"[PROXY_DEBUG] _read_dotenv({key}) 尝试: {fpath}")
         if not os.path.isfile(fpath):
+            print(f"[PROXY_DEBUG]   文件不存在")
             continue
         try:
             with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
-                for line in f:
+                for i, line in enumerate(f, 1):
                     line = line.strip()
                     # 跳过空行和注释
                     if not line or line.startswith("#"):
@@ -79,9 +82,11 @@ def _read_dotenv(key: str) -> str:
                     m = re.match(rf'({re.escape(key)})\s*=\s*(.*)', line)
                     if m:
                         val = m.group(2).strip().strip('"').strip("'")
+                        print(f"[PROXY_DEBUG]   第 {i} 行匹配: {val!r}")
                         if val:
                             return val
-        except OSError:
+        except OSError as e:
+            print(f"[PROXY_DEBUG]   读取失败: {e}")
             continue
 
     return os.getenv(key, "")
