@@ -7,7 +7,7 @@ import re
 
 from . import noco_config as cfg
 from . import noco_utils as utils
-from plugins.noco_utils import extract_steam_id
+from plugins.steam_utils import extract_steam_id
 
 queryWishlist = on_command("queryWishlist", aliases={"queryWishlist"}, priority=10, block=True)
 
