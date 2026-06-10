@@ -74,7 +74,7 @@ async def take_screenshot(url: str):
             context = await browser.new_context(**ctx_kwargs)
             page = await context.new_page()
             print("new")
-            await page.goto(url)
+            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
             print("goto")
 
             print("screenshot_bytes")

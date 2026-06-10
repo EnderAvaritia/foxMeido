@@ -138,7 +138,7 @@ async def get_choice(number: int):
         await steam_searcher.finish("Playwright初始化失败", at_sender=False)
         return
     try:
-        await page.goto(link)
+        await page.goto(link, wait_until="domcontentloaded", timeout=60000)
         await page.wait_for_timeout(2000)
         # 处理年龄验证
         if await page.query_selector('//a[@id="view_product_page_btn"]'):

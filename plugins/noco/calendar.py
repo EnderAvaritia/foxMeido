@@ -57,7 +57,7 @@ async def take_screenshot():
     await init_playwright()
     print("new_browser")
     if page:
-        await page.goto(url)
+        await page.goto(url, wait_until="domcontentloaded", timeout=60000)
         print("page_goto")
         
         print("screenshot_bytes")

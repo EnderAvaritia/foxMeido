@@ -56,7 +56,7 @@ async def take_screenshot(args: str):
             
             url = f"https://www.iflow.work/?page_num=1&platforms=buff-igxe-uuyp-eco-c5&games=csgo&sort_by=sell&min_price={min_price}&max_price=5000&min_volume={min_volume}&max_latency=0&price_mode=buy"
 
-            await page.goto(url)
+            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
             print("goto")
 
             print("screenshot_bytes")

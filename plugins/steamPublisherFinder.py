@@ -99,7 +99,7 @@ async def take_screenshot(url: str):
         log_error("steamPublisherFinder.take_screenshot", "Playwright初始化失败")
         return None
     try:
-        await page.goto(url)
+        await page.goto(url, wait_until="domcontentloaded", timeout=60000)
     except Exception as e:
         log_error("steamPublisherFinder.take_screenshot", f"页面跳转失败: {e}")
         return None
