@@ -31,9 +31,9 @@ def _env_bool(key: str, default: str) -> bool:
     return os.getenv(key, default).strip().lower() in ("true", "1", "yes")
 
 
-# 项目根目录：此文件位于 plugins/noco/，往上级 2 层
+# 项目根目录：此文件位于 plugins/noco/，往上级 3 层
 _PROJECT_ROOT: str = os.path.dirname(
-    os.path.dirname(os.path.abspath(__file__))
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
 
 
@@ -57,7 +57,6 @@ def _read_dotenv(key: str) -> str:
 
     # 兜底：直接读 .env 文件
     env_name = os.getenv("ENVIRONMENT", "")
-    print(f"[PROXY_DEBUG] _read_dotenv({key}) _PROJECT_ROOT={_PROJECT_ROOT!r} ENVIRONMENT={env_name!r}")
     candidates: list[str] = []
     if env_name:
         candidates.append(f".env.{env_name}")
@@ -65,13 +64,11 @@ def _read_dotenv(key: str) -> str:
 
     for fname in candidates:
         fpath = os.path.join(_PROJECT_ROOT, fname)
-        print(f"[PROXY_DEBUG] _read_dotenv({key}) 尝试: {fpath}")
         if not os.path.isfile(fpath):
-            print(f"[PROXY_DEBUG]   文件不存在")
             continue
         try:
             with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
-                for i, line in enumerate(f, 1):
+                for line in f:
                     line = line.strip()
                     # 跳过空行和注释
                     if not line or line.startswith("#"):
@@ -82,11 +79,9 @@ def _read_dotenv(key: str) -> str:
                     m = re.match(rf'({re.escape(key)})\s*=\s*(.*)', line)
                     if m:
                         val = m.group(2).strip().strip('"').strip("'")
-                        print(f"[PROXY_DEBUG]   第 {i} 行匹配: {val!r}")
                         if val:
                             return val
-        except OSError as e:
-            print(f"[PROXY_DEBUG]   读取失败: {e}")
+        except OSError:
             continue
 
     return os.getenv(key, "")
