@@ -21,7 +21,7 @@ nb plugin install nonebot_plugin_apscheduler
 cp .env.example .env
 ```
 
-编辑 `.env`，至少需要配置 QQ 机器人凭证。详见下方 [配置](#配置)。
+编辑 `.env`，配置 NapCat 连接信息。详见下方 [配置](#配置)。
 
 ### 运行
 
@@ -33,12 +33,29 @@ nb run
 
 所有配置通过 `.env` 文件设置（已 gitignore）。参考 `.env.example`。
 
-### 必需
+### 必需（NapCat / OneBot V11）
+
+通过 WebSocket 连接 [NapCat](https://github.com/NapNeko/NapCatQQ)（或其他 OneBot V11 实现），无需 QQ 开放平台凭证。
 
 | 变量 | 说明 |
 |------|------|
-| `QQ_BOTS` | QQ 机器人凭证（BOT_APP_ID / BOT_TOKEN / BOT_SECRET），在 [QQ 开放平台](https://q.qq.com/) 创建应用获取 |
-| `COMMAND_START` | 指令前缀，默认 `["#"]` |
+| `DRIVER` | NoneBot 驱动，必须包含 `~websockets` 以支持 ws 连接 |
+| `ONEBOT_WS_URLS` | NapCat WebSocket 地址，格式 `["ws://ip:port"]` |
+| `ONEBOT_API_ROOTS` | NapCat HTTP API 地址，格式 `{"bot_qq": "http://ip:port/"}` |
+| `HOST` | 监听地址，默认 `127.0.0.1` |
+| `PORT` | 监听端口 |
+| `COMMAND_START` | 指令前缀，默认 `[""]`（无前缀） |
+
+`.env` 示例：
+
+```env
+DRIVER=~httpx+~websockets
+ONEBOT_API_ROOTS={"2326291391": "http://127.0.0.1:26657/"}
+ONEBOT_WS_URLS=["ws://192.168.10.14:26657"]
+HOST=127.0.0.1
+PORT=26657
+COMMAND_START=[""] 
+```
 
 ### NocoDB（可选）
 
