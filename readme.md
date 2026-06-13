@@ -67,7 +67,7 @@ nb run
 
 | 变量 | 说明 |
 |------|------|
-| `STEAM_COOKIE` | Steam 登录 Cookie（wish 功能需要） |
+| `STEAM_COOKIE` | Steam 登录 Cookie，`wish` 功能需要。从浏览器 F12 → 网络请求 → 请求头中复制 `Cookie:` 整行。格式：`sessionid=xxx; steamLogin=xxx; steamLoginSecure=xxx; ...` |
 | `CURATOR_ID` | Steam 鉴赏家 ID（unreported 功能需要） |
 
 ## 命令
@@ -85,10 +85,10 @@ Steam 商店链接会自动触发查询（如发送 `https://store.steampowered.
 
 ## 错误日志
 
-运行中的异常自动写入 `logs/error.log`（项目根目录），同时打印到控制台。
+运行中的异常自动写入 `logs/` 目录，每次错误一个时间戳文件。
 
-- 轮转：5MB × 3 份
-- 格式：`[时间] [ERROR] [来源] 错误描述`
+- 文件格式：`error_<时间戳>.log` 或 `crash_<时间戳>.log`
+- 内容：`[时间] [来源] 描述` + 异常堆栈
 
 ## 项目结构
 
@@ -98,6 +98,7 @@ foxMeido/
 ├── pyproject.toml        # NoneBot 项目配置
 ├── logs/                 # 错误日志（自动创建）
 └── plugins/
+    ├── steam_utils.py    # Steam 通用工具
     ├── cs.py             # CS2 挂刀行情
     ├── dota.py           # Dota2 挂刀行情
     ├── finder.py         # 通用页面截图
@@ -111,7 +112,7 @@ foxMeido/
     └── noco/
         ├── __init__.py
         ├── noco_config.py       # 配置中心
-        ├── noco_utils.py        # 共享工具函数
+        ├── noco_utils.py        # NocoDB 工具函数
         ├── error_logger.py      # 错误日志模块
         ├── playwright_utils.py  # 共享 Playwright 工具
         ├── bind.py / get.py / wish.py / ...
