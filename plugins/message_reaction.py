@@ -1,15 +1,15 @@
 """
 message_reaction.py - 消息表情回复模块
 
-提供：
-1. 自动钩子 — 收到群消息后立即添加表情回复（如 ✅）
-2. 核心函数 — 供其他插件手动调用
+收到群消息后自动添加表情回复（如 ✅），由 on_message priority=1 钩子触发。
 
 用法：
-    # 自动钩子：在 .env 中设置 MESSAGE_REACTION_ENABLED=true
+    # .env 中启用：
+    MESSAGE_REACTION_ENABLED=true
+    MESSAGE_REACTION_FACE_ID=32
 
     # 手动调用（其他插件中）：
-    from plugins.message_reaction import send_reaction, remove_reaction
+    from plugins.message_reaction import send_reaction
     await send_reaction(bot, group_id=..., message_id=..., face_id="351")
 
 配置（.env）：
@@ -17,7 +17,7 @@ message_reaction.py - 消息表情回复模块
     MESSAGE_REACTION_FACE_ID  - QQ 表情 ID（默认 32=✅）
 
 支持的协议端：
-    - NapCat/OneBot V11（send_group_msg_reaction API）
+    - NapCat QQ（set_msg_emoji_like API）
     不支持的协议端自动忽略，不会报错。
 """
 
