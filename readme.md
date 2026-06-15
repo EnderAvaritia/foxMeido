@@ -135,7 +135,8 @@ foxMeido/
     ├── steamPublisherFinder.py    # 发行商页面查询
     ├── steamPublisherFinderAuto.py# 发行商链接自动触发
     ├── steamSearcher.py  # Steam 游戏搜索
-    ├── message_reaction.py # 消息表情回复（可选，NapCat/OneBot）
+    ├── reaction_utils.py   # 表情回复工具模块（send_reaction 核心函数）
+    ├── message_reaction.py # 表情回复自动钩子（基于 reaction_utils）
     └── noco/
         ├── __init__.py
         ├── noco_config.py       # 配置中心
