@@ -164,11 +164,9 @@ async def send_reaction(
 
     try:
         await bot.call_api(
-            "send_group_msg_reaction",
-            group_id=group_id,
-            message_id=message_id,
-            code=face_id,
-            is_add=is_add,
+            "set_msg_emoji_like",
+            message_id=str(message_id),
+            emoji_id=str(face_id),
         )
         action = "添加" if is_add else "移除"
         logger.opt(colors=True).debug(
@@ -181,7 +179,7 @@ async def send_reaction(
         if "1404" in msg:
             _API_UNSUPPORTED = True
             logger.opt(colors=True).warning(
-                f"<yellow>✗</yellow> 协议端不支持 send_group_msg_reaction，"
+                f"<yellow>✗</yellow> 协议端不支持 set_msg_emoji_like，"
                 f"已自动禁用表情回复功能"
             )
         else:
