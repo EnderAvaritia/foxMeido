@@ -7,17 +7,12 @@ import re
 
 from . import noco_config as cfg
 from . import noco_utils as utils
-from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
 
 bind = on_command("bind", aliases={"bind"}, priority=10, block=True)
 
 
 @bind.handle()
 async def handle_function(bot, event):
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    if group_id and message_id:
-        await send_reaction(bot, group_id, message_id)
     userId = str(event.user_id)
     nickname = event.sender.nickname
 

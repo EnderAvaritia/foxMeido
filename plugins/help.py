@@ -1,16 +1,10 @@
 from nonebot.rule import to_me
 from nonebot.plugin import on_command
 
-from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
-
 help = on_command("help", rule=to_me())
 
 @help.handle()
 async def handle_function(bot, event):
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    if group_id and message_id:
-        await send_reaction(bot, group_id, message_id)
     text = (
         "📖 可用命令\n\n"
         "id <游戏ID或商店链接>\n"

@@ -9,7 +9,6 @@ from nonebot.rule import to_me
 from plugins.noco.noco_config import get_http_proxy
 from plugins.noco.playwright_utils import create_browser_page
 from plugins.noco.error_logger import log_error
-from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_alconna import Alconna, Args, Match, UniMessage, on_alconna  # noqa: E402
@@ -35,10 +34,6 @@ steam_searcher = on_alconna(
 
 @steam_searcher.handle()
 async def handle_function(bot, event, name: Match[str]):
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    if group_id and message_id:
-        await send_reaction(bot, group_id, message_id)
     if name.available:
         # 如果参数已经提供，直接处理
         steam_searcher.set_path_arg("name", name.result)
