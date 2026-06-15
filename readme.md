@@ -87,6 +87,15 @@ COMMAND_START=[""]
 | `STEAM_COOKIE` | Steam 登录 Cookie，`wish` 功能需要。从浏览器 F12 → 网络请求 → 请求头中复制 `Cookie:` 整行。格式：`sessionid=xxx; steamLogin=xxx; steamLoginSecure=xxx; ...` |
 | `CURATOR_ID` | Steam 鉴赏家 ID（unreported 功能需要） |
 
+### 消息表情回复（可选）
+
+收到消息后立即添加 QQ 表情回应（如 ✅），类似 frontier 的 `send_group_message_reaction` 模式。仅 NapCat/OneBot V11 支持，不支持时自动忽略。
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `MESSAGE_REACTION_ENABLED` | `false` | 是否启用表情回复 |
+| `MESSAGE_REACTION_FACE_ID` | `32` | QQ 表情 ID。常用：`32`=✅ `212`=🤔 `26`=❌ `351`=👍 |
+
 ## 命令
 
 | 命令 | 别名 | 说明 |
@@ -126,6 +135,7 @@ foxMeido/
     ├── steamPublisherFinder.py    # 发行商页面查询
     ├── steamPublisherFinderAuto.py# 发行商链接自动触发
     ├── steamSearcher.py  # Steam 游戏搜索
+    ├── message_reaction.py # 消息表情回复（可选，NapCat/OneBot）
     └── noco/
         ├── __init__.py
         ├── noco_config.py       # 配置中心
