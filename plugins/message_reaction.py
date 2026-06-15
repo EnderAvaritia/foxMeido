@@ -130,6 +130,9 @@ def extract_message_id(event: Any) -> int | str | None:
 
 # ── 核心函数 ──────────────────────────────────────────────────
 
+# 协议端不支持时的缓存标记，避免每条消息都报错
+_API_UNSUPPORTED: bool = False
+
 
 async def send_reaction(
     bot: Any,
@@ -151,6 +154,11 @@ async def send_reaction(
     Returns:
         bool: 是否成功发送（False 表示协议端不支持）
     """
+    global _API_UNSUPPORTED
+
+    if _API_UNSUPPORTED:
+        return False
+
     if face_id is None:
         _, face_id = get_reaction_config()
 
@@ -168,10 +176,19 @@ async def send_reaction(
         )
         return True
     except Exception as e:
-        logger.opt(colors=True).warning(
-            f"<yellow>✗</yellow> 表情回复失败 group={group_id} msg={message_id} "
-            f"face={face_id} is_add={is_add}: {type(e).__name__}: {e}"
-        )
+        msg = str(e)
+        # retcode=1404 = 不支持的API，标记后不再重试
+        if "1404" in msg:
+            _API_UNSUPPORTED = True
+            logger.opt(colors=True).warning(
+                f"<yellow>✗</yellow> 协议端不支持 send_group_msg_reaction，"
+                f"已自动禁用表情回复功能"
+            )
+        else:
+            logger.opt(colors=True).warning(
+                f"<yellow>✗</yellow> 表情回复失败 group={group_id} msg={message_id} "
+                f"face={face_id} is_add={is_add}: {type(e).__name__}: {e}"
+            )
         return False
 
 
