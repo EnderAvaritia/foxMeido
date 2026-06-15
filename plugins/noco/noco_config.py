@@ -45,6 +45,8 @@ def _read_dotenv(key: str) -> str:
     os.getenv() 可能取不到值。此函数直接逐行扫描 .env 文件，
     匹配 ``KEY=VALUE`` 模式，不依赖 dotenv 库。
 
+    支持行内注释：``KEY=VALUE  # comment`` 会返回 ``VALUE``。
+
     搜索顺序：
     1. ``.env.{ENVIRONMENT}``（如果设置了 ENVIRONMENT）
     2. ``.env``
@@ -53,7 +55,7 @@ def _read_dotenv(key: str) -> str:
     # 先从 os.environ 取（正常情况）
     value = os.getenv(key, "")
     if value:
-        return value
+        return value.split("#")[0].strip()
 
     # 兜底：直接读 .env 文件
     env_name = os.getenv("ENVIRONMENT", "")
@@ -79,6 +81,8 @@ def _read_dotenv(key: str) -> str:
                     m = re.match(rf'({re.escape(key)})\s*=\s*(.*)', line)
                     if m:
                         val = m.group(2).strip().strip('"').strip("'")
+                        # 去掉行内注释
+                        val = val.split("#")[0].strip()
                         if val:
                             return val
         except OSError:
