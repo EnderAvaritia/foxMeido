@@ -10,12 +10,17 @@ import re
 from . import noco_config as cfg
 from . import noco_utils as utils
 from plugins.steam_utils import extract_steam_id, get_game_info
+from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
 
 get = on_command("get", aliases={"get"}, priority=10, block=True)
 
 
 @get.handle()
 async def handle_function(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
+    group_id = extract_group_id(event)
+    message_id = extract_message_id(event)
+    if group_id and message_id:
+        await send_reaction(bot, group_id, message_id)
     args_str = args.extract_plain_text().strip()
     params = args_str.split()
 

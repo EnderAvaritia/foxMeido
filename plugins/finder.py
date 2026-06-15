@@ -15,12 +15,16 @@ from playwright.async_api import async_playwright
 
 from plugins.noco.noco_config import get_proxies, get_http_proxy
 from plugins.noco.error_logger import log_error
+from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
 
 finder = on_command("finder", rule=to_me(), aliases={"finder"}, priority=10, block=True)
 
 @finder.handle()
 async def handle_function(bot, event, args: Message = CommandArg()):
-    
+    group_id = extract_group_id(event)
+    message_id = extract_message_id(event)
+    if group_id and message_id:
+        await send_reaction(bot, group_id, message_id)
     # goodId = args.extract_plain_text()
     # goodIdList = goodId.split()
     # message = "\n".join(goodIdList)

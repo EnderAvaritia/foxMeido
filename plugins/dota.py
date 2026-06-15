@@ -14,12 +14,16 @@ from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
 from plugins.noco.error_logger import log_error
+from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
 
 dota = on_command("dota", rule=to_me(), aliases={"dota"}, priority=10, block=True)
 
 @dota.handle()
 async def handle_function(bot, event, messages: Message = CommandArg()):
-    
+    group_id = extract_group_id(event)
+    message_id = extract_message_id(event)
+    if group_id and message_id:
+        await send_reaction(bot, group_id, message_id)
     
     messages = messages.extract_plain_text()
     messages = messages.split()

@@ -15,8 +15,8 @@ from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 from . import noco_config as cfg
+from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
 
-                  
 
 browser = None
 page = None
@@ -42,6 +42,10 @@ calendar = on_command("calendar", rule=to_me(), aliases={"cale", "愿望单", "�
 @calendar.handle()
 
 async def handle_function(bot, event, args: Message = CommandArg()):
+    group_id = extract_group_id(event)
+    message_id = extract_message_id(event)
+    if group_id and message_id:
+        await send_reaction(bot, group_id, message_id)
     pic_data = await take_screenshot()
         
     if pic_data:

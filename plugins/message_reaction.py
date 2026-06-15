@@ -1,16 +1,20 @@
 """
 message_reaction.py - 消息表情回复模块
 
-收到群消息后自动添加表情回复（如 ✅），由 on_message priority=1 钩子触发。
+提供 send_reaction 核心函数，各 handler 在触发成功后主动调用。
 
 用法：
     # .env 中启用：
     MESSAGE_REACTION_ENABLED=true
     MESSAGE_REACTION_FACE_ID=32
 
-    # 手动调用（其他插件中）：
-    from plugins.message_reaction import send_reaction
-    await send_reaction(bot, group_id=..., message_id=..., face_id="351")
+    # 在 handler 中调用：
+    from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
+
+    group_id = extract_group_id(event)
+    message_id = extract_message_id(event)
+    if group_id and message_id:
+        await send_reaction(bot, group_id, message_id, face_id="351")
 
 配置（.env）：
     MESSAGE_REACTION_ENABLED  - 是否启用（默认 false）
@@ -27,7 +31,6 @@ import os
 import re
 from typing import Any
 
-from nonebot import on_message
 from nonebot.log import logger
 
 # ── 项目根目录 ────────────────────────────────────────────────
@@ -198,67 +201,3 @@ async def remove_reaction(
 ) -> bool:
     """移除群消息表情回复（便捷函数）。"""
     return await send_reaction(bot, group_id, message_id, face_id=face_id, is_add=False)
-
-
-# ── 自动钩子 ──────────────────────────────────────────────────
-# priority=1 先于所有命令处理器（priority=10）运行
-# block=False 不阻止消息继续传递到下层处理器
-
-# 已知命令关键字（用于判断是否可能触发回复）
-_TRIGGER_KEYWORDS: set[str] = {
-    "ping", "help", "cs", "dota",
-    "finder", "find",
-    "steam", "steamGoods", "查商店", "id",
-    "steamPublishers", "pub",
-    "prase", "bind", "get", "wish", "remain",
-    "probe", "report", "unfinished", "unreported", "queryWishlist",
-    "calendar", "cale", "愿望单", "冤枉单", "任务",
-    "weather",
-}
-# 自动触发前缀
-_TRIGGER_PREFIXES: tuple[str, ...] = (
-    "https://store.steampowered.com/app/",
-    "https://store.steampowered.com/publisher/",
-)
-
-
-def _should_react(event) -> bool:
-    """判断消息是否可能触发回复。"""
-    if getattr(event, "to_me", False):
-        return True
-    text = getattr(event, "raw_text", None) or event.get_plaintext() if hasattr(event, "get_plaintext") else ""
-    if not text:
-        return False
-    text = text.strip()
-    if text.startswith(_TRIGGER_PREFIXES):
-        return True
-    first_word = text.split()[0].lower() if text else ""
-    return first_word in _TRIGGER_KEYWORDS
-
-
-_reaction_handler = on_message(priority=1, block=False)
-
-
-@_reaction_handler.handle()
-async def _handle_message_reaction(bot, event):
-    """收到可能触发回复的群消息时添加表情回复。"""
-    enabled, face_id = get_reaction_config()
-    logger.opt(colors=True).debug(
-        f"<cyan>[Reaction]</cyan> 收到消息 MESSAGE_REACTION_ENABLED={enabled} "
-        f"face_id={face_id!r} event_type={type(event).__name__}"
-    )
-    if not enabled:
-        return
-
-    if not _should_react(event):
-        return
-
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    logger.opt(colors=True).debug(
-        f"<cyan>[Reaction]</cyan> 提取结果 group_id={group_id!r} message_id={message_id!r}"
-    )
-    if group_id is None or message_id is None:
-        return
-
-    await send_reaction(bot, group_id=group_id, message_id=message_id, face_id=face_id)
