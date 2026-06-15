@@ -203,18 +203,54 @@ async def remove_reaction(
 # ── 自动钩子 ──────────────────────────────────────────────────
 # priority=1 先于所有命令处理器（priority=10）运行
 # block=False 不阻止消息继续传递到下层处理器
+
+# 已知命令关键字（用于判断是否可能触发回复）
+_TRIGGER_KEYWORDS: set[str] = {
+    "ping", "help", "cs", "dota",
+    "finder", "find",
+    "steam", "steamGoods", "查商店", "id",
+    "steamPublishers", "pub",
+    "prase", "bind", "get", "wish", "remain",
+    "probe", "report", "unfinished", "unreported", "queryWishlist",
+    "calendar", "cale", "愿望单", "冤枉单", "任务",
+    "weather",
+}
+# 自动触发前缀
+_TRIGGER_PREFIXES: tuple[str, ...] = (
+    "https://store.steampowered.com/app/",
+    "https://store.steampowered.com/publisher/",
+)
+
+
+def _should_react(event) -> bool:
+    """判断消息是否可能触发回复。"""
+    if getattr(event, "to_me", False):
+        return True
+    text = getattr(event, "raw_text", None) or event.get_plaintext() if hasattr(event, "get_plaintext") else ""
+    if not text:
+        return False
+    text = text.strip()
+    if text.startswith(_TRIGGER_PREFIXES):
+        return True
+    first_word = text.split()[0].lower() if text else ""
+    return first_word in _TRIGGER_KEYWORDS
+
+
 _reaction_handler = on_message(priority=1, block=False)
 
 
 @_reaction_handler.handle()
 async def _handle_message_reaction(bot, event):
-    """收到群消息后立即添加表情回复。"""
+    """收到可能触发回复的群消息时添加表情回复。"""
     enabled, face_id = get_reaction_config()
     logger.opt(colors=True).debug(
         f"<cyan>[Reaction]</cyan> 收到消息 MESSAGE_REACTION_ENABLED={enabled} "
         f"face_id={face_id!r} event_type={type(event).__name__}"
     )
     if not enabled:
+        return
+
+    if not _should_react(event):
         return
 
     group_id = extract_group_id(event)
