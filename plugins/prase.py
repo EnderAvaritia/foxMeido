@@ -6,7 +6,7 @@ from nonebot.rule import to_me
 
 import re
 
-from plugins.reaction_utils import send_reaction, extract_group_id, extract_message_id
+from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
 
 prase = on_command("prase", rule=to_me())
 

@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
 from plugins.noco.error_logger import log_error
-from plugins.reaction_utils import send_reaction, extract_group_id, extract_message_id
+from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
 
 dota = on_command("dota", rule=to_me(), aliases={"dota"}, priority=10, block=True)
 

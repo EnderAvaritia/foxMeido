@@ -15,7 +15,7 @@ from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 from . import noco_config as cfg
-from plugins.reaction_utils import send_reaction, extract_group_id, extract_message_id
+from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
 
 								 
 

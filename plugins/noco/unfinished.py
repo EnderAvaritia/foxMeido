@@ -15,7 +15,7 @@ from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 
 from . import noco_config as cfg
 from . import noco_utils as utils
-from plugins.reaction_utils import send_reaction, extract_group_id, extract_message_id
+from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
 
 unfinished = on_command("unfinished", aliases={"unfinished"}, priority=10, block=True)
 
