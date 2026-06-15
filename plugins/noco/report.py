@@ -26,6 +26,7 @@ import re
 from . import noco_config as cfg
 from . import noco_utils as utils
 from plugins.steam_utils import extract_steam_id
+from plugins.reaction_utils import send_reaction, extract_group_id, extract_message_id
 
 report = on_command("report", aliases={"report"}, priority=10, block=True)
 
@@ -51,7 +52,11 @@ def batch_update_records(records: list) -> tuple[int, int, list[str]]:
 
 
 @report.handle()
-async def handle_function(event: MessageEvent, args: Message = CommandArg()):
+async def handle_function(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
+    group_id = extract_group_id(event)
+    message_id = extract_message_id(event)
+    if group_id and message_id:
+        await send_reaction(bot, group_id, message_id)
     arg_text = args.extract_plain_text().strip()
     if not arg_text:
         await report.finish(

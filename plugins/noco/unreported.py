@@ -18,6 +18,7 @@ import re
 from . import noco_config as cfg
 from . import noco_utils as utils
 from plugins.steam_utils import extract_steam_id
+from plugins.reaction_utils import send_reaction, extract_group_id, extract_message_id
 
 unreported = on_command("unreported", aliases={"unreported"}, priority=10, block=True)
 
@@ -56,7 +57,11 @@ def format_unreported_output(records_data: dict) -> str:
 
 
 @unreported.handle()
-async def handle_function(event: MessageEvent, args: Message = CommandArg()):
+async def handle_function(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
+    group_id = extract_group_id(event)
+    message_id = extract_message_id(event)
+    if group_id and message_id:
+        await send_reaction(bot, group_id, message_id)
     arg_text = args.extract_plain_text().strip()
     game_id = None
 
