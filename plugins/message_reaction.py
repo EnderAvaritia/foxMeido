@@ -39,10 +39,13 @@ _PROJECT_ROOT: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _read_dotenv(key: str) -> str:
-    """直接从 .env 文件逐行扫描读取变量值（兜底方案）。"""
+    """直接从 .env 文件逐行扫描读取变量值（兜底方案）。
+
+    支持行内注释：``KEY=VALUE  # comment`` 会返回 ``VALUE``。
+    """
     value = os.getenv(key, "")
     if value:
-        return value
+        return value.split("#")[0].strip()
     env_name = os.getenv("ENVIRONMENT", "")
     candidates: list[str] = []
     if env_name:
@@ -64,6 +67,8 @@ def _read_dotenv(key: str) -> str:
                     m = re.match(rf"({re.escape(key)})\s*=\s*(.*)", line)
                     if m:
                         val = m.group(2).strip().strip('"').strip("'")
+                        # 去掉行内注释
+                        val = val.split("#")[0].strip()
                         if val:
                             return val
         except OSError:
@@ -158,12 +163,15 @@ async def send_reaction(
             is_add=is_add,
         )
         action = "添加" if is_add else "移除"
-        logger.debug(
-            f"已{action}表情回复 group={group_id} msg={message_id} face={face_id}"
+        logger.opt(colors=True).debug(
+            f"<green>✓</green> 已{action}表情回复 group={group_id} msg={message_id} face={face_id}"
         )
         return True
-    except Exception:
-        # 协议端不支持表情回复，静默忽略
+    except Exception as e:
+        logger.opt(colors=True).warning(
+            f"<yellow>✗</yellow> 表情回复失败 group={group_id} msg={message_id} "
+            f"face={face_id} is_add={is_add}: {type(e).__name__}: {e}"
+        )
         return False
 
 
@@ -187,11 +195,18 @@ _reaction_handler = on_message(priority=1, block=False)
 async def _handle_message_reaction(bot, event):
     """收到群消息后立即添加表情回复。"""
     enabled, face_id = get_reaction_config()
+    logger.opt(colors=True).debug(
+        f"<cyan>[Reaction]</cyan> 收到消息 MESSAGE_REACTION_ENABLED={enabled} "
+        f"face_id={face_id!r} event_type={type(event).__name__}"
+    )
     if not enabled:
         return
 
     group_id = extract_group_id(event)
     message_id = extract_message_id(event)
+    logger.opt(colors=True).debug(
+        f"<cyan>[Reaction]</cyan> 提取结果 group_id={group_id!r} message_id={message_id!r}"
+    )
     if group_id is None or message_id is None:
         return
 
