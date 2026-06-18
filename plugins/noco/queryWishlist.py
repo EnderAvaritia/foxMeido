@@ -10,7 +10,7 @@ from . import noco_utils as utils
 from plugins.steam_utils import extract_steam_id
 from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
 
-queryWishlist = on_command("queryWishlist", aliases={"queryWishlist"}, priority=10, block=True)
+queryWishlist = on_command("queryWishlist", aliases={"queryWishlist","queryWish","qwish"}, priority=10, block=True)
 
 
 def format_wishlist_response(data: dict) -> str:
