@@ -7,7 +7,7 @@ from nonebot import require
 from nonebot.rule import to_me
 
 from plugins.noco.noco_config import get_http_proxy
-from plugins.noco.playwright_utils import create_browser_page
+from plugins.playwright_utils import create_browser_page
 from plugins.noco.error_logger import log_error
 from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
 

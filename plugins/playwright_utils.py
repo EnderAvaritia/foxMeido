@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from playwright.async_api import async_playwright
 
-from .noco_config import get_http_proxy
-from .error_logger import log_error
+from plugins.noco.noco_config import get_http_proxy
+from plugins.noco.error_logger import log_error
 
 
 async def create_browser_page(
