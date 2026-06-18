@@ -61,7 +61,7 @@ def _write_log(
     if extra:
         lines.append("Extra context:")
         for k, v in extra.items():
-            lines.append(f"  {k}: {v!r}")
+            lines.append(f"  {k}: {v}")
 
     with open(filepath, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
