@@ -16,18 +16,14 @@ from playwright.async_api import TimeoutError as PlaywrightTimeout
 from nonebot import on_startswith
 
 from plugins.noco.noco_config import get_proxies
-from plugins.playwright_utils import create_browser_page
+from plugins.playwright_utils import ensure_browser, create_page
 from plugins.noco.error_logger import log_error
 from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
 
-browser = None
-page = None
 
-
-async def init_playwright():
-    global browser, page
-    if browser is None:
-        browser, page = await create_browser_page(viewport_size={"width": 800, "height": 19200})
+async def ensure_browser_ready():
+    """确保浏览器已启动（全局缓存）。"""
+    return await ensure_browser()
 
 
 steamPublishersAuto = on_startswith(("https://store.steampowered.com/publisher/"), ignorecase=False, priority=20, block=True)
@@ -93,45 +89,45 @@ async def fetch_title(url: str) -> str:
 
 async def take_screenshot(url: str):
     print("start_screenshot")
-    try:
-        await init_playwright()
-    except Exception as e:
-        log_error("steamPublisherFinderAuto.take_screenshot", f"Playwright 初始化异常: {e}")
-        return None
-    print("new_browser")
-    if not page:
+    if not await ensure_browser_ready():
         log_error("steamPublisherFinderAuto.take_screenshot", "Playwright初始化失败")
         return None
-    try:
-        await page.goto(url, wait_until="domcontentloaded", timeout=60000)
-    except Exception as e:
-        log_error("steamPublisherFinderAuto.take_screenshot", f"页面跳转失败: {e}")
+    page = await create_page(viewport_size={"width": 800, "height": 19200})
+    if not page:
+        log_error("steamPublisherFinderAuto.take_screenshot", "创建页面失败")
         return None
-    print("page_goto")
     try:
-        title = await page.title()
-        if title == "Welcome to Steam":
-            log_error("steamPublisherFinderAuto.take_screenshot", f"页面跳转至Welcome to Steam，URL可能无效: {url}")
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        except Exception as e:
+            log_error("steamPublisherFinderAuto.take_screenshot", f"页面跳转失败: {e}")
+            return None
+        print("page_goto")
+        try:
+            title = await page.title()
+            if title == "Welcome to Steam":
+                log_error("steamPublisherFinderAuto.take_screenshot", f"页面跳转至Welcome to Steam，URL可能无效: {url}")
+                return None
+            
+            if await page.query_selector('//a[@id="view_product_page_btn"]'):
+                print("view_product_page_btn")
+                await page.click('//select[@name="ageYear"]')
+                await page.select_option('//select[@name="ageYear"]', '1900')
+                await page.click('//a[@id="view_product_page_btn"]')
+        except Exception as e:
+            log_error("steamPublisherFinderAuto.take_screenshot", f"页面处理异常: {e}")
             return None
         
-        if await page.query_selector('//a[@id="view_product_page_btn"]'):
-            print("view_product_page_btn")
-            await page.click('//select[@name="ageYear"]')
-            await page.select_option('//select[@name="ageYear"]', '1900')
-            await page.click('//a[@id="view_product_page_btn"]')
-    except Exception as e:
-        log_error("steamPublisherFinderAuto.take_screenshot", f"页面处理异常: {e}")
-        return None
-    
-    print("screenshot_bytes")
-    try:
-        screenshot_bytes = await page.locator('xpath=//div[@id="RecommendationsRows"]').screenshot()
-    except PlaywrightTimeout:
-        log_error("steamPublisherFinderAuto.take_screenshot", "截图超时，30秒内元素未出现")
-        screenshot_bytes = None
-    except PlaywrightError as e:
-        msg = e.message if hasattr(e, 'message') else str(e)
-        log_error("steamPublisherFinderAuto.take_screenshot", f"页面打开失败: {msg}")
-        screenshot_bytes = None
-
-    return screenshot_bytes
+        print("screenshot_bytes")
+        try:
+            screenshot_bytes = await page.locator('xpath=//div[@id="RecommendationsRows"]').screenshot()
+            return screenshot_bytes
+        except PlaywrightTimeout:
+            log_error("steamPublisherFinderAuto.take_screenshot", "截图超时，30秒内元素未出现")
+            return None
+        except PlaywrightError as e:
+            msg = e.message if hasattr(e, 'message') else str(e)
+            log_error("steamPublisherFinderAuto.take_screenshot", f"页面打开失败: {msg}")
+            return None
+    finally:
+        await page.context.close()
