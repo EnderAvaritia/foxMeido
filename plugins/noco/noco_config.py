@@ -28,13 +28,16 @@ from typing import Any
 
 
 def _env_bool(key: str, default: str) -> bool:
-    return os.getenv(key, default).strip().lower() in ("true", "1", "yes")
+    return (_read_dotenv(key) or default).strip().lower() in ("true", "1", "yes")
 
 
 # 项目根目录：此文件位于 plugins/noco/，往上级 3 层
 _PROJECT_ROOT: str = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
+print(f"[CONFIG] 项目根目录: {_PROJECT_ROOT}")
+print(f"[CONFIG] .env 路径: {os.path.join(_PROJECT_ROOT, '.env')}")
+print(f"[CONFIG] .env 是否存在: {os.path.isfile(os.path.join(_PROJECT_ROOT, '.env'))}")
 
 
 def _read_dotenv(key: str) -> str:
@@ -92,14 +95,20 @@ def _read_dotenv(key: str) -> str:
 
 
 # ── NocoDB 连接 ─────────────────────────────────────────────
-NOCO_URL: str = os.getenv("NOCO_URL", "https://127.0.0.1:52533/api/v2/tables")
-NOCO_TOKEN: str = os.getenv("NOCO_TOKEN", "")
+NOCO_URL: str = _read_dotenv("NOCO_URL") or "https://127.0.0.1:52533/api/v2/tables"
+NOCO_TOKEN: str = _read_dotenv("NOCO_TOKEN") or ""
 
 # ── 表格 ID（每个表格一个变量，查询时自行拼接 URL） ────────
-ACCOUNT_TABLE_ID: str = os.getenv("NOCO_ACCOUNT_TABLE", "")
-RECORD_TABLE_ID: str = os.getenv("NOCO_RECORD_TABLE", "")
-REMAIN_TABLE_ID: str = os.getenv("NOCO_REMAIN_TABLE", "")
-WISHLIST_TABLE_ID: str = os.getenv("NOCO_WISHLIST_TABLE", "")
+ACCOUNT_TABLE_ID: str = _read_dotenv("NOCO_ACCOUNT_TABLE") or ""
+RECORD_TABLE_ID: str = _read_dotenv("NOCO_RECORD_TABLE") or ""
+REMAIN_TABLE_ID: str = _read_dotenv("NOCO_REMAIN_TABLE") or ""
+WISHLIST_TABLE_ID: str = _read_dotenv("NOCO_WISHLIST_TABLE") or ""
+
+print(f"[CONFIG] NOCO_URL={NOCO_URL!r}")
+print(f"[CONFIG] ACCOUNT_TABLE_ID={ACCOUNT_TABLE_ID!r}")
+print(f"[CONFIG] RECORD_TABLE_ID={RECORD_TABLE_ID!r}")
+print(f"[CONFIG] REMAIN_TABLE_ID={REMAIN_TABLE_ID!r}")
+print(f"[CONFIG] WISHLIST_TABLE_ID={WISHLIST_TABLE_ID!r}")
 
 # ── 请求通用配置 ─────────────────────────────────────────────
 HEADERS: dict[str, str] = {"xc-token": NOCO_TOKEN}
@@ -141,8 +150,8 @@ def get_proxies() -> dict[str, str]:
 
 # ── 模块级常量（兼容旧代码，但优先使用上面的函数）───────────
 # 注意：这些在模块导入时求值，如果 dotenv 尚未加载则可能为空。
-HTTP_PROXY: str = os.getenv("HTTP_PROXY", "")
-HTTPS_PROXY: str = os.getenv("HTTPS_PROXY", "")
+HTTP_PROXY: str = _read_dotenv("HTTP_PROXY") or ""
+HTTPS_PROXY: str = _read_dotenv("HTTPS_PROXY") or ""
 # 同步
 if HTTP_PROXY and not HTTPS_PROXY:
     HTTPS_PROXY = HTTP_PROXY
@@ -155,8 +164,8 @@ if HTTP_PROXY:
     PROXIES["https"] = HTTPS_PROXY
 
 # ── Steam ────────────────────────────────────────────────────
-STEAM_COOKIE: str = os.getenv("STEAM_COOKIE", "")
-CURATOR_ID: int = int(os.getenv("CURATOR_ID", "0"))
+STEAM_COOKIE: str = _read_dotenv("STEAM_COOKIE") or ""
+CURATOR_ID: int = int(_read_dotenv("CURATOR_ID") or "0")
 
 
 # ── 便捷函数 ─────────────────────────────────────────────────
