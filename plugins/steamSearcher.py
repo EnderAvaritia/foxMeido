@@ -7,17 +7,12 @@ from nonebot import require
 from nonebot.rule import to_me
 
 from plugins.noco.noco_config import get_http_proxy
-from plugins.playwright_utils import ensure_browser, create_page
+from plugins.playwright_utils import take_app_screenshot
 from plugins.noco.error_logger import log_error
 from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_alconna import Alconna, Args, Match, UniMessage, on_alconna  # noqa: E402
-
-
-async def ensure_browser_ready():
-    """确保浏览器已启动（全局缓存）。"""
-    return await ensure_browser()
 
 
 steam_searcher = on_alconna(
@@ -129,34 +124,17 @@ async def get_choice(number: int):
         await steam_searcher.reject("无效的选择，请重试", at_sender=False)
         return
     link = game_links[number - 1]
-    if not await ensure_browser_ready():
-        log_error("steamSearcher.get_choice", "Playwright初始化失败")
-        await steam_searcher.finish("Playwright初始化失败", at_sender=False)
-        return
-    page = await create_page()
-    if not page:
-        log_error("steamSearcher.get_choice", "创建页面失败")
-        await steam_searcher.finish("Playwright创建页面失败", at_sender=False)
-        return
+    # 从 URL 如 https://store.steampowered.com/app/12345/ 中提取 appid
+    parts = link.split("/")
     try:
-        try:
-            await page.goto(link, wait_until="domcontentloaded", timeout=60000)
-            await page.wait_for_timeout(2000)
-            # 处理年龄验证
-            if await page.query_selector('//a[@id="view_product_page_btn"]'):
-                await page.click('//select[@name="ageYear"]')
-                await page.select_option('//select[@name="ageYear"]', "1900")
-                await page.click('//a[@id="view_product_page_btn"]')
-                await page.wait_for_timeout(2000)
-            # 截图详情
-            if await page.query_selector('xpath=//div[@class="glance_ctn"]'):
-                screenshot_bytes = await page.locator('xpath=//div[@class="glance_ctn"]').screenshot()
-                pic = UniMessage.image(raw=screenshot_bytes)
-                await steam_searcher.finish(message=pic, at_sender=False)
-            else:
-                await steam_searcher.finish("未能获取详情页面", at_sender=False)
-        except Exception as e:
-            log_error("steamSearcher.get_choice", f"截图过程异常: {e}")
-            await steam_searcher.finish("截图过程出错", at_sender=False)
-    finally:
-        await page.context.close()
+        appid_idx = parts.index("app")
+        appid = parts[appid_idx + 1]
+    except (ValueError, IndexError):
+        await steam_searcher.finish("无效的链接", at_sender=False)
+        return
+    screenshot_bytes = await take_app_screenshot(appid)
+    if screenshot_bytes:
+        pic = UniMessage.image(raw=screenshot_bytes)
+        await steam_searcher.finish(message=pic, at_sender=False)
+    else:
+        await steam_searcher.finish("未能获取详情页面", at_sender=False)
