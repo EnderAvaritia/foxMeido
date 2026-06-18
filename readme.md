@@ -154,13 +154,13 @@ foxMeido/
     ├── steamPublisherFinder.py    # 发行商页面查询
     ├── steamPublisherFinderAuto.py# 发行商链接自动触发
     ├── steamSearcher.py  # Steam 游戏搜索
+    ├── playwright_utils.py # 共享 Playwright 工具
     ├── message_reaction.py # 表情回复模块（核心函数 + 自动钩子）
     └── noco/
         ├── __init__.py
         ├── noco_config.py       # 配置中心
         ├── noco_utils.py        # NocoDB 工具函数
         ├── error_logger.py      # 错误日志模块
-        ├── playwright_utils.py  # 共享 Playwright 工具
         ├── bind.py / get.py / wish.py / ...
         └── README.md            # NocoDB 子模块文档
 ```
