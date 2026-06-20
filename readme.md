@@ -87,6 +87,27 @@ COMMAND_START=[""]
 | `STEAM_COOKIE` | Steam 登录 Cookie，`wish` 功能需要。从浏览器 F12 → 网络请求 → 请求头中复制 `Cookie:` 整行。格式：`sessionid=xxx; steamLogin=xxx; steamLoginSecure=xxx; ...` |
 | `CURATOR_ID` | Steam 鉴赏家 ID（unreported 功能需要） |
 
+### 鉴赏家副本监控（可选）
+
+监控 Steam 鉴赏家后台的待处理游戏副本邀请，有新副本到达时通过 QQ 群消息（和/或 ntfy）推送通知。
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `CURATOR_ENABLED` | `false` | 是否启用每日定时检查 |
+| `CURATOR_NAME` | `鉴赏家` | 鉴赏家显示名称 |
+| `CURATOR_NOTIFY_GROUP` | — | 每日定时推送的目标群号 |
+| `CURATOR_CHECK_TIME` | `09:00` | 每日定时检查时间 |
+| `CURATOR_NTFY_TOPIC` | — | ntfy topic，设了则额外推送到手机 |
+
+**命令：**
+
+| 命令 | 说明 |
+|------|------|
+| `pending` | 手动触发一次检查，结果发送到当前群 |
+| `pending test` | 发送测试推送（QQ 消息 + ntfy 如有配置） |
+
+`STEAM_COOKIE` 需包含 `sessionid` 和 `steamLoginSecure`，与上方 Steam 配置共用。
+
 ### 消息表情回复（可选）
 
 收到消息后立即添加 QQ 表情回应（如 ✅），类似 frontier 的 `send_group_message_reaction` 模式。仅 NapCat/OneBot V11 支持，不支持时自动忽略。
@@ -124,6 +145,7 @@ COMMAND_START=[""]
 | `find <关键字>` | `搜索steam游戏` | 交互式搜索 Steam 游戏 |
 | `cs [最低价] [日销量]` | — | CS2 挂刀行情表 |
 | `dota [最低价] [日销量]` | — | Dota2 挂刀行情表 |
+| `pending` | — | 鉴赏家副本监控，手动触发检查 |
 | `help` | — | 显示帮助 |
 
 Steam 商店链接会自动触发查询（如发送 `https://store.steampowered.com/app/3251240`）。
@@ -145,6 +167,7 @@ foxMeido/
 └── plugins/
     ├── steam_utils.py    # Steam 通用工具
     ├── cs.py             # CS2 挂刀行情
+    ├── curator_monitor.py# Steam 鉴赏家副本监控
     ├── dota.py           # Dota2 挂刀行情
     ├── finder.py         # 通用页面截图
     ├── help.py           # 帮助命令
