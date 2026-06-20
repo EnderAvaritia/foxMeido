@@ -202,7 +202,7 @@ def build_url(curator_id: str, curator_name: str) -> str:
 
 
 def fetch_pending_html(curator_id: str, curator_name: str,
-                       cookie_dict: dict[str, str]) -> str:
+                       cookie_str: str) -> str:
     """抓取 pending 页面，返回 HTML 文本。"""
     url = build_url(curator_id, curator_name)
     proxies = get_proxies()
@@ -214,11 +214,15 @@ def fetch_pending_html(curator_id: str, curator_name: str,
         "Accept-Language": "en-US,en;q=0.9",
         "X-Requested-With": "XMLHttpRequest",
         "Referer": url.replace("?ajax=1", ""),
+        "Cookie": cookie_str,
     }
 
-    resp = requests.get(url, headers=headers, cookies=cookie_dict,
-                        proxies=proxies, timeout=30)
+    resp = requests.get(url, headers=headers, proxies=proxies, timeout=30)
     resp.raise_for_status()
+
+    if logger.level("DEBUG"):
+        logger.debug("Steam 响应前 500 字: {}", resp.text[:500])
+
     return resp.text
 
 
@@ -293,8 +297,7 @@ def detect_changes(
 def run_check() -> CheckResult:
     """执行一次完整的检查流程。"""
     cfg = get_config()
-    cookie_dict = parse_cookie(cfg["cookie"])
-    html = fetch_pending_html(cfg["curator_id"], cfg["curator_name"], cookie_dict)
+    html = fetch_pending_html(cfg["curator_id"], cfg["curator_name"], cfg["cookie"])
     result = parse_pending_page(html)
 
     seen = load_seen_games()
