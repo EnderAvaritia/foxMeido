@@ -56,7 +56,7 @@ async def handle_function(bot, event):
 
     gameInfo = get_game_info(goodId)
 
-    if cfg.STEAM_COOKIE:
+    if cfg.WISH_ADD_TO_STEAM and cfg.STEAM_COOKIE:
         result = add_to_wishlist(goodId, cfg.STEAM_COOKIE)
         print(f"愿望单添加{'成功' if result else '失败'}")
     if "error" in gameInfo:
