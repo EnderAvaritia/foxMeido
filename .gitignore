@@ -6,3 +6,4 @@
 /plugins/__pycache__
 /plugins/weather.py
 /logs/
+/db/
