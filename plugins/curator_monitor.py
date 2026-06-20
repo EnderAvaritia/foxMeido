@@ -469,11 +469,6 @@ def _parse_check_time(time_str: str) -> tuple[int, int]:
 async def scheduled_check():
     """定时任务：每日检查待处理副本并推送到指定群。"""
     cfg = get_config()
-
-    if not cfg["enabled"]:
-        logger.debug("CURATOR_ENABLED=false，跳过定时检查")
-        return
-
     notify_group = cfg["notify_group"]
     if not notify_group:
         logger.info("CURATOR_NOTIFY_GROUP 未配置，跳过定时推送")
@@ -499,16 +494,19 @@ async def scheduled_check():
 # ── 插件初始化 ────────────────────────────────────────────────────
 _init_db()
 
-# 注册定时任务
-_check_time = _read_dotenv("CURATOR_CHECK_TIME") or "09:00"
-_hour, _minute = _parse_check_time(_check_time)
-scheduler.add_job(
-    scheduled_check,
-    "cron",
-    hour=_hour,
-    minute=_minute,
-    id="curator_daily_check",
-    replace_existing=True,
-    misfire_grace_time=300,
-)
-logger.info(f"鉴赏家监控已注册，定时检查时间: {_check_time}")
+# 注册定时任务（仅在启用时）
+_cfg = get_config()
+if _cfg["enabled"]:
+    _hour, _minute = _parse_check_time(_cfg["check_time"])
+    scheduler.add_job(
+        scheduled_check,
+        "cron",
+        hour=_hour,
+        minute=_minute,
+        id="curator_daily_check",
+        replace_existing=True,
+        misfire_grace_time=300,
+    )
+    logger.info(f"鉴赏家监控已注册，定时检查时间: {_cfg['check_time']}")
+else:
+    logger.info("鉴赏家监控未启用（CURATOR_ENABLED=false），仅支持手动 pending 命令")
