@@ -31,9 +31,8 @@ from typing import Any
 import requests
 from bs4 import BeautifulSoup
 
-from nonebot import require, get_bot
+from nonebot import require, get_bot, on_startswith
 from nonebot.plugin import on_command
-from nonebot.rule import to_me
 from nonebot.log import logger
 
 from plugins.noco.noco_config import get_proxies
@@ -48,8 +47,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "curator_state.db"
 CST = timezone(timedelta(hours=8))
 
-# ── 命令行 ────────────────────────────────────────────────────────
-curator_cmd = on_command("pending", rule=to_me(), priority=10, block=True)
+# ── 默认 ──────────────────────────────────────────────────────────
+curator_cmd = on_startswith("pending", ignorecase=False, priority=20, block=True)
 
 
 # ── 数据结构 ──────────────────────────────────────────────────────
