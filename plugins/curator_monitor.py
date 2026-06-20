@@ -34,6 +34,7 @@ from bs4 import BeautifulSoup
 from nonebot import require, get_bot, on_startswith
 from nonebot.plugin import on_command
 from nonebot.log import logger
+from nonebot.exception import FinishedException
 
 from plugins.noco.noco_config import get_proxies
 from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
@@ -450,6 +451,8 @@ async def handle_curator(bot, event):
         await curator_cmd.finish(msg, at_sender=False)
     except requests.RequestException as e:
         await curator_cmd.finish(f"❌ 网络请求失败: {e}", at_sender=False)
+    except FinishedException:
+        raise
     except Exception as e:
         logger.exception("检查异常")
         await curator_cmd.finish(f"❌ 检查异常: {e}", at_sender=False)
