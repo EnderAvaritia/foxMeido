@@ -218,10 +218,13 @@ def fetch_pending_html(curator_id: str, curator_name: str,
     }
 
     resp = requests.get(url, headers=headers, proxies=proxies, timeout=30)
-    resp.raise_for_status()
 
-    logger.info("Steam 响应头: {}", dict(resp.headers))
-    logger.info("Steam 响应前 300 字: {}", resp.text[:300])
+    logger.info("请求 URL: {}", url)
+    logger.info("Steam 状态码: {}, 响应体长度: {}", resp.status_code, len(resp.text))
+    logger.info("Steam 响应头 Location: {}", resp.headers.get("Location", "无"))
+    logger.info("Steam 响应前 300 字: {}", resp.text[:300] if resp.text else "(空)")
+
+    resp.raise_for_status()
 
     return resp.text
 
