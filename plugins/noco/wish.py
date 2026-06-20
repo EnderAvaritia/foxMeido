@@ -38,7 +38,7 @@ def add_to_wishlist(appid: str | int, cookie: str) -> bool:
         data = response.json()
     except ValueError:
         return False
-    return "wishlistCount" in data
+    return data.get("success", False)
 
 
 @wish.handle()
