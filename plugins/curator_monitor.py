@@ -442,14 +442,12 @@ async def handle_curator(bot, event):
         else:
             await curator_cmd.finish("ntfy 未配置，仅发送了 QQ 消息", at_sender=False)
 
-    # 执行检查
-    await curator_cmd.send("🔍 正在检查鉴赏家待处理副本...", at_sender=False)
+    # 执行检查（不再发"正在检查"，✅表情即为响应）
     try:
         result = run_check()
-        if result.new_games or result.updated_games:
-            await curator_cmd.finish("有", at_sender=False)
-        else:
-            await curator_cmd.finish("无", at_sender=False)
+        cfg = get_config()
+        msg = format_result(result, cfg["curator_name"])
+        await curator_cmd.finish(msg, at_sender=False)
     except requests.RequestException as e:
         await curator_cmd.finish(f"❌ 网络请求失败: {e}", at_sender=False)
     except FinishedException:
