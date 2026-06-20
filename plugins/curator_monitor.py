@@ -309,7 +309,7 @@ def run_check() -> CheckResult:
         maybe_ntfy(result, cfg["curator_name"])
 
     logger.info(
-        "鉴赏家检查完成: 待处理 %d, 游戏 %d 款, 新增 %d",
+        "鉴赏家检查完成: 待处理 {}, 游戏 {} 款, 新增 {}",
         result.total_pending, len(result.games), len(result.new_games),
     )
     return result
