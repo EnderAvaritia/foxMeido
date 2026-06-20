@@ -220,8 +220,8 @@ def fetch_pending_html(curator_id: str, curator_name: str,
     resp = requests.get(url, headers=headers, proxies=proxies, timeout=30)
     resp.raise_for_status()
 
-    if logger.level("DEBUG"):
-        logger.debug("Steam 响应前 500 字: {}", resp.text[:500])
+    logger.info("Steam 响应头: {}", dict(resp.headers))
+    logger.info("Steam 响应前 300 字: {}", resp.text[:300])
 
     return resp.text
 
