@@ -407,7 +407,7 @@ async def send_to_group(group_id: str, message: str) -> None:
 
 # ── 手动命令 ──────────────────────────────────────────────────────
 @curator_cmd.handle()
-async def handle_curator(bot: Any, event: Any):
+async def handle_curator(bot, event):
     group_id = extract_group_id(event)
     message_id = extract_message_id(event)
     if group_id and message_id:
