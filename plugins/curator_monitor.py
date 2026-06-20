@@ -446,9 +446,10 @@ async def handle_curator(bot, event):
     await curator_cmd.send("🔍 正在检查鉴赏家待处理副本...", at_sender=False)
     try:
         result = run_check()
-        cfg = get_config()
-        msg = format_result(result, cfg["curator_name"])
-        await curator_cmd.finish(msg, at_sender=False)
+        if result.new_games or result.updated_games:
+            await curator_cmd.finish("有", at_sender=False)
+        else:
+            await curator_cmd.finish("无", at_sender=False)
     except requests.RequestException as e:
         await curator_cmd.finish(f"❌ 网络请求失败: {e}", at_sender=False)
     except FinishedException:
