@@ -17,7 +17,7 @@ noco_config.py - NocoDB 配置中心
   HTTP_PROXY           - HTTP 代理地址（默认空 = 不使用代理）
   HTTPS_PROXY          - HTTPS 代理地址（默认空 = 跟随 HTTP_PROXY）
   STEAM_COOKIE         - Steam 登录 Cookie（wish 用）
-  CURATOR_ID           - Steam 鉴赏家 ID（unreported 用）
+  CURATOR_ID           - Steam 鉴赏家 ID（curator_monitor / unreported 用）
 """
 
 from __future__ import annotations

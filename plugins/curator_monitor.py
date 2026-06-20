@@ -9,7 +9,7 @@ Steam 鉴赏家待处理副本监控 - NoneBot2 插件
   pending test         — 发送测试推送
 
 配置（.env）：
-  STEAM_COOKIE          — Steam 登录 Cookie（复用，与 wish 共用）
+  CURATOR_COOKIE        — Steam 鉴赏家后台 Cookie（与商店页面 cookie 不同）
   CURATOR_ID             — 鉴赏家 ID
   CURATOR_NAME           — 鉴赏家名称（可选，默认 "鉴赏家"）
   CURATOR_ENABLED       — 是否启用每日定时检查（默认 false）
@@ -79,7 +79,7 @@ def _read_dotenv(key: str) -> str:
 
 def get_config() -> dict[str, Any]:
     """读取插件所需的所有配置项。"""
-    cookie = _read_dotenv("STEAM_COOKIE")
+    cookie = _read_dotenv("CURATOR_COOKIE")
     curator_id = _read_dotenv("CURATOR_ID")
     curator_name = _read_dotenv("CURATOR_NAME") or "鉴赏家"
     notify_group = _read_dotenv("CURATOR_NOTIFY_GROUP")
@@ -418,7 +418,7 @@ async def handle_curator(bot, event):
     is_test = len(args) > 1 and args[1] == "test"
 
     if not is_configured():
-        await curator_cmd.finish("⚠️ 未配置 STEAM_COOKIE 和 CURATOR_ID，请先设置 .env")
+        await curator_cmd.finish("⚠️ 未配置 CURATOR_COOKIE 和 CURATOR_ID，请先设置 .env")
 
     if is_test:
         cfg = get_config()
@@ -474,7 +474,7 @@ async def scheduled_check():
         return
 
     if not is_configured():
-        logger.info("STEAM_COOKIE 或 CURATOR_ID 未配置，跳过定时推送")
+        logger.info("CURATOR_COOKIE 或 CURATOR_ID 未配置，跳过定时推送")
         return
 
     logger.info("定时检查：开始执行")

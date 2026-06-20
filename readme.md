@@ -84,7 +84,7 @@ COMMAND_START=[""]
 
 | 变量 | 说明 |
 |------|------|
-| `STEAM_COOKIE` | Steam 登录 Cookie，`wish` 功能需要。从浏览器 F12 → 网络请求 → 请求头中复制 `Cookie:` 整行。格式：`sessionid=xxx; steamLogin=xxx; steamLoginSecure=xxx; ...` |
+| `STEAM_COOKIE` | Steam **商店页面** Cookie，`wish` 功能需要。从浏览器访问 store.steampowered.com → F12 → 复制请求头 `Cookie:` 整行。格式：`sessionid=xxx; steamLogin=xxx; ...` |
 | `CURATOR_ID` | Steam 鉴赏家 ID（unreported 功能需要） |
 
 ### 鉴赏家副本监控（可选）
@@ -93,6 +93,7 @@ COMMAND_START=[""]
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
+| `CURATOR_COOKIE` | — | Steam **鉴赏家后台** Cookie（与商店 cookie 不同），必须包含 `sessionid` 和 `steamLoginSecure`。从浏览器访问 `store.steampowered.com/curator/{id}/admin` → F12 → 复制请求头 `Cookie:` |
 | `CURATOR_ENABLED` | `false` | 是否启用每日定时检查 |
 | `CURATOR_NAME` | `鉴赏家` | 鉴赏家显示名称 |
 | `CURATOR_NOTIFY_GROUP` | — | 每日定时推送的目标群号 |
@@ -105,8 +106,6 @@ COMMAND_START=[""]
 |------|------|
 | `pending` | 手动触发一次检查，结果发送到当前群 |
 | `pending test` | 发送测试推送（QQ 消息 + ntfy 如有配置） |
-
-`STEAM_COOKIE` 需包含 `sessionid` 和 `steamLoginSecure`，与上方 Steam 配置共用。
 
 ### 消息表情回复（可选）
 
