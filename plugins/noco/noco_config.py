@@ -16,9 +16,8 @@ noco_config.py - NocoDB 配置中心
                             如果使用公共 CA 证书的 HTTPS，可设为 true。
   HTTP_PROXY           - HTTP 代理地址（默认空 = 不使用代理）
   HTTPS_PROXY          - HTTPS 代理地址（默认空 = 跟随 HTTP_PROXY）
-   STEAM_COOKIE         - Steam 登录 Cookie（wish 用）
-   WISH_ADD_TO_STEAM    - /wish 时是否自动加入 Steam 愿望单（true/false, 默认 false）
-   CURATOR_ID           - Steam 鉴赏家 ID（unreported 用）
+  STEAM_COOKIE         - Steam 登录 Cookie（wish 用）
+  CURATOR_ID           - Steam 鉴赏家 ID（unreported 用）
 """
 
 from __future__ import annotations
@@ -167,8 +166,6 @@ if HTTP_PROXY:
 # ── Steam ────────────────────────────────────────────────────
 STEAM_COOKIE: str = _read_dotenv("STEAM_COOKIE") or ""
 CURATOR_ID: int = int(_read_dotenv("CURATOR_ID") or "0")
-# 是否在执行 /wish 时自动将游戏加入 Steam 愿望单（需要 STEAM_COOKIE）
-WISH_ADD_TO_STEAM: bool = _env_bool("WISH_ADD_TO_STEAM", "false")
 
 
 # ── 便捷函数 ─────────────────────────────────────────────────

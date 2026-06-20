@@ -50,7 +50,6 @@ plugins/noco/
 | `HTTP_PROXY` | HTTP 代理 | `http://127.0.0.1:7890` |
 | `HTTPS_PROXY` | HTTPS 代理 | `http://127.0.0.1:7890` |
 | `STEAM_COOKIE` | Steam 登录 Cookie（wish 用） | `""` |
-| `WISH_ADD_TO_STEAM` | /wish 时是否自动加入 Steam 愿望单 | `false` |
 | `CURATOR_ID` | Steam 鉴赏家 ID（unreported 用） | `0` |
 
 ### 示例 .env 配置
@@ -69,7 +68,6 @@ HTTPS_PROXY=http://127.0.0.1:7890
 
 # ── Steam（可选） ──
 STEAM_COOKIE=your_steam_cookie
-WISH_ADD_TO_STEAM=true
 CURATOR_ID=12345
 ```
 
