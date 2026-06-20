@@ -110,21 +110,25 @@ async def _navigate_with_age_gate(
     Returns:
         True 表示成功，False 表示页面不存在/跳转失败。
     """
+    print(f"[screenshot] 开始导航: {url}")
     try:
         await page.goto(url, wait_until="domcontentloaded", timeout=60000)
     except Exception as e:
         log_error("_navigate_with_age_gate", f"页面跳转失败: {url} {e}")
         return False
 
+    print("[screenshot] 导航完成")
     if wait_after_nav:
         await page.wait_for_timeout(wait_after_nav)
 
     try:
         title = await page.title()
+        print(f"[screenshot] 页面标题: {title}")
         if title == "Welcome to Steam":
             return False
 
         if await page.query_selector('//a[@id="view_product_page_btn"]'):
+            print("[screenshot] 年龄验证")
             await page.click('//select[@name="ageYear"]')
             await page.select_option('//select[@name="ageYear"]', '1900')
             await page.click('//a[@id="view_product_page_btn"]')
@@ -157,6 +161,7 @@ async def take_app_screenshot(appid: str) -> bytes | None:
     自动处理年龄验证，失败/不存在返回 None。
     并发安全 —— 每次调用创建独立 page。
     """
+    print(f"[screenshot] take_app_screenshot: appid={appid}")
     url = f"https://store.steampowered.com/app/{appid}/_/?l=schinese"
     if not await ensure_browser():
         return None
@@ -166,9 +171,11 @@ async def take_app_screenshot(appid: str) -> bytes | None:
     try:
         if not await _navigate_with_age_gate(page, url):
             return None
+        print("[screenshot] 开始截图 glance_ctn")
         return await _screenshot_element(page, '//div[@class="glance_ctn"]')
     finally:
         await page.context.close()
+        print("[screenshot] 页面已关闭")
 
 
 async def take_publisher_screenshot(url: str) -> bytes | None:
