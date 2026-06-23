@@ -221,7 +221,7 @@ async def reaction_cleanup(
 ):
     """添加表情回应并返回移除函数。handler 在处理结束后调用移除函数即可。
 
-    是否自动移除受 .env 配置 MESSAGE_REACTION_AUTO_REMOVE 控制（默认 true）。
+    是否自动移除受 .env 配置 MESSAGE_REACTION_AUTO_REMOVE 控制（默认 false）。
 
     用法：:
 
