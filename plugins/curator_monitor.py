@@ -300,16 +300,17 @@ def run_check() -> CheckResult:
     result.new_games, result.updated_games = detect_changes(
         result.games, seen, track_copies=False)
 
-    # 更新 SQLite 状态
+    # 更新 SQLite 状态，然后读取入库总数
     save_seen_games(result.games)
+    total_in_db = len(load_seen_games())
 
     # 可选 ntfy 推送
     if result.new_games or result.updated_games:
         maybe_ntfy(result, cfg["curator_name"])
 
     logger.info(
-        "鉴赏家检查完成: 待处理 {}, 游戏 {} 款, 新增 {}",
-        result.total_pending, len(result.games), len(result.new_games),
+        "鉴赏家检查完成: 待处理 {}, 游戏 {} 款, 新增 {}, 累计 {}",
+        result.total_pending, len(result.games), len(result.new_games), total_in_db,
     )
     return result
 
