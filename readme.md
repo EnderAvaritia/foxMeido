@@ -115,6 +115,7 @@ COMMAND_START=[""]
 |------|--------|------|
 | `MESSAGE_REACTION_ENABLED` | `false` | 是否启用表情回复 |
 | `MESSAGE_REACTION_FACE_ID` | `32` | QQ 表情 ID，详见常见 ID 表 |
+| `MESSAGE_REACTION_AUTO_REMOVE` | `true` | 处理结束后是否自动撤回表情 |
 
 **常见 QQ 表情 ID：**
 
