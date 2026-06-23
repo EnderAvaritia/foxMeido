@@ -16,19 +16,17 @@ from nonebot import on_startswith
 from plugins.noco.noco_config import get_proxies
 from plugins.playwright_utils import take_publisher_screenshot
 from plugins.noco.error_logger import log_error
-from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
+from plugins.message_reaction import reaction_cleanup
 
 
 steamPublishersAuto = on_startswith(("https://store.steampowered.com/publisher/"), ignorecase=False, priority=20, block=True)
 
 @steamPublishersAuto.handle()
 async def handle_function(bot, event):
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    if group_id and message_id:
-        await send_reaction(bot, group_id, message_id)
+    cleanup = await reaction_cleanup(bot, event)
     publisher = event.get_plaintext()
     await send_message(publisher)
+    if cleanup: await cleanup()
 
 
 async def send_message(publisher):

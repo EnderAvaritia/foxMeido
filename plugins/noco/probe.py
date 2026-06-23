@@ -28,7 +28,7 @@ import time
 
 from . import noco_config as cfg
 from . import noco_utils as utils
-from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
+from plugins.message_reaction import reaction_cleanup
 
 probe = on_command("probe", aliases={"probe"}, priority=10, block=True)
 
@@ -79,18 +79,17 @@ def format_output(completed_records: list) -> str:
 
 @probe.handle()
 async def handle_function(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    if group_id and message_id:
-        await send_reaction(bot, group_id, message_id)
+    cleanup = await reaction_cleanup(bot, event)
     await probe.send("开始检测record表中的link有效性...")
 
     url = cfg.url_with_filter(cfg.RECORD_TABLE_ID, "(submitTime,eq,null)", sort="userId")
     records_data = utils.get_records(url)
 
     if "error" in records_data:
+        if cleanup: await cleanup()
         await probe.finish(f"获取记录失败: {records_data['error']}")
     if "list" not in records_data or not records_data["list"]:
+        if cleanup: await cleanup()
         await probe.finish("没有找到submitTime为null的记录")
 
     records = records_data["list"]
@@ -120,4 +119,5 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
 
     output = format_output(completed_records)
     stats = f"\r\n\r\n检测完成！\r\n共检测 {checked_count} 条记录\r\n成功更新 {success_count} 条记录"
+    if cleanup: await cleanup()
     await probe.finish(output + stats)

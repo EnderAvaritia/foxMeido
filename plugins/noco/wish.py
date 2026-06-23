@@ -10,7 +10,7 @@ import json
 from . import noco_config as cfg
 from . import noco_utils as utils
 from plugins.steam_utils import extract_steam_id, get_game_info
-from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
+from plugins.message_reaction import reaction_cleanup
 
 wish = on_command("wish", aliases={"wish"}, priority=10, block=True)
 
@@ -43,15 +43,13 @@ def add_to_wishlist(appid: str | int, cookie: str) -> bool:
 
 @wish.handle()
 async def handle_function(bot, event):
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    if group_id and message_id:
-        await send_reaction(bot, group_id, message_id)
+    cleanup = await reaction_cleanup(bot, event)
     userId = event.user_id
     nickname = event.sender.nickname
 
     goodId = extract_steam_id(str(event.message).strip())
     if not goodId:
+        if cleanup: await cleanup()
         await wish.finish("你确定这是商品的id？")
 
     gameInfo = get_game_info(goodId)
@@ -60,11 +58,13 @@ async def handle_function(bot, event):
         result = add_to_wishlist(goodId, cfg.STEAM_COOKIE)
         print(f"愿望单添加{'成功' if result else '失败'}")
     if "error" in gameInfo:
+        if cleanup: await cleanup()
         await wish.finish(f"游戏{goodId}数据获取出错，请反馈")
 
     accountUrl = cfg.url_with_filter(cfg.ACCOUNT_TABLE_ID, f"(account,eq,{userId})")
     accountRecord = utils.get_record(accountUrl)
     if "id" not in accountRecord:
+        if cleanup: await cleanup()
         await wish.finish(f"请id为{userId}的\n{nickname}先使用bind指令进行登记")
 
     wishlistUrl = cfg.url_with_filter(
@@ -81,6 +81,7 @@ async def handle_function(bot, event):
         }
         updated = utils.update_record(cfg.table_url(cfg.WISHLIST_TABLE_ID), updatePayload)
         if wishlistRecord["id"] == updated["id"]:
+            if cleanup: await cleanup()
             await wish.finish(
                 f'id为{goodId}的游戏\n《{gameInfo["game_name"]}》\n'
                 f'已经在{wishlistRecord["submitTime"]}被你许过愿了'
@@ -101,8 +102,10 @@ async def handle_function(bot, event):
         }
         recordResult = utils.create_record(cfg.table_url(cfg.WISHLIST_TABLE_ID), createPayload)
         if "id" not in recordResult:
+            if cleanup: await cleanup()
             await wish.finish(f"登记阶段出现未知错误，请反馈")
         else:
+            if cleanup: await cleanup()
             await wish.finish(
                 f'id为{userId}的用户{nickname}\n'
                 f'对id为{goodId}的游戏《{gameInfo["game_name"]}》\n'

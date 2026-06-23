@@ -18,7 +18,7 @@ import re
 from . import noco_config as cfg
 from . import noco_utils as utils
 from plugins.steam_utils import extract_steam_id
-from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
+from plugins.message_reaction import reaction_cleanup
 
 unreported = on_command("unreported", aliases={"unreported"}, priority=10, block=True)
 
@@ -58,10 +58,7 @@ def format_unreported_output(records_data: dict) -> str:
 
 @unreported.handle()
 async def handle_function(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    if group_id and message_id:
-        await send_reaction(bot, group_id, message_id)
+    cleanup = await reaction_cleanup(bot, event)
     arg_text = args.extract_plain_text().strip()
     game_id = None
 
@@ -70,6 +67,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
         if not game_id and re.match(r"^\d+$", arg_text):
             game_id = arg_text
         if not game_id:
+            if cleanup: await cleanup()
             await unreported.finish("请输入有效的游戏ID或Steam商店链接")
 
     if game_id:
@@ -84,4 +82,5 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
 
     records_data = utils.get_records(url)
     output = format_unreported_output(records_data)
+    if cleanup: await cleanup()
     await unreported.finish(output)

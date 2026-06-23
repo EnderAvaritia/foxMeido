@@ -30,17 +30,14 @@ import re
 from . import noco_config as cfg
 from . import noco_utils as utils
 from plugins.steam_utils import extract_steam_id, get_game_info
-from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
+from plugins.message_reaction import reaction_cleanup
 
 remain = on_command("remain", aliases={"remain"}, priority=10, block=True)
 
 
 @remain.handle()
 async def handle_function(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    if group_id and message_id:
-        await send_reaction(bot, group_id, message_id)
+    cleanup = await reaction_cleanup(bot, event)
     arg_text = args.extract_plain_text().strip()
 
     # ── 无参数：列出所有可领取的游戏 ──
@@ -51,16 +48,20 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
         try:
             data = utils.get_records(url)
             if "error" in data:
+                if cleanup: await cleanup()
                 await remain.finish(f"查询出错: {data['error']}")
             games = data.get("list", [])
             if not games:
+                if cleanup: await cleanup()
                 await remain.finish("当前没有可领取的游戏")
             lines = []
             for g in games:
                 c = int(g.get("canBeClaimed", 0))
                 lines.append(f"《{g.get('gameName', '未知游戏')}》剩余{c}个")
+            if cleanup: await cleanup()
             await remain.finish("\r\n".join(lines))
         except Exception as e:
+            if cleanup: await cleanup()
             await remain.finish(f"查询可领取游戏时出错: {str(e)}")
 
     # ── 有参数：解析 ──
@@ -69,6 +70,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
     if not game_id and re.match(r"^\d+$", parts[0]):
         game_id = parts[0]
     if not game_id:
+        if cleanup: await cleanup()
         await remain.finish("未检测到有效的游戏ID，请提供Steam游戏ID或Steam商店链接")
 
     # 查询现有记录
@@ -79,6 +81,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
     if len(parts) == 1:
         if "id" in existing:
             remaining = existing["totalCount"] - existing["getedCount"]
+            if cleanup: await cleanup()
             await remain.finish(
                 f"游戏《{existing['gameName']}》(ID: {game_id}) 当前领取情况：\n"
                 f"总份数: {existing['totalCount']}\n"
@@ -89,6 +92,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
         else:
             info = get_game_info(game_id)
             name = info.get("game_name") or f"ID: {game_id}"
+            if cleanup: await cleanup()
             await remain.finish(f"游戏《{name}》(ID: {game_id}) 尚未登记剩余份数")
 
     # ── 登记/更新 ──
@@ -96,14 +100,18 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
         try:
             count = int(parts[1])
             if count <= 0:
+                if cleanup: await cleanup()
                 await remain.finish("份数必须大于0")
         except ValueError:
+            if cleanup: await cleanup()
             await remain.finish("份数必须是整数")
 
         info = get_game_info(game_id)
         if "error" in info:
+            if cleanup: await cleanup()
             await remain.finish(f"游戏{game_id}数据获取出错：{info['error']}")
         if not info["game_name"]:
+            if cleanup: await cleanup()
             await remain.finish(f"无法获取游戏{game_id}的名称，请检查游戏ID是否正确")
 
         url = cfg.table_url(cfg.REMAIN_TABLE_ID)
@@ -121,6 +129,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
             }
             result = utils.update_record(url, payload)
             if "id" in result:
+                if cleanup: await cleanup()
                 await remain.finish(
                     f"游戏《{info['game_name']}》(ID: {game_id}) 的剩余份数已更新\n"
                     f"原总份数: {existing['totalCount']}\n"
@@ -129,6 +138,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
                     f"剩余可领取: {new_total - existing['getedCount']}"
                 )
             else:
+                if cleanup: await cleanup()
                 await remain.finish("更新记录失败，请检查网络或配置")
         else:
             payload = {
@@ -140,6 +150,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
             }
             result = utils.create_record(url, payload)
             if "id" in result:
+                if cleanup: await cleanup()
                 await remain.finish(
                     f"游戏《{info['game_name']}》(ID: {game_id}) 已成功登记\n"
                     f"总份数: {count}\n"
@@ -148,8 +159,10 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
                     f"记录ID: {result['id']}"
                 )
             else:
+                if cleanup: await cleanup()
                 await remain.finish("创建记录失败，请检查网络或配置")
     else:
+        if cleanup: await cleanup()
         await remain.finish(
             "请输入游戏ID/URL和份数，格式：remain 游戏ID/URL 份数\n"
             "或输入游戏ID/URL查询当前领取情况"

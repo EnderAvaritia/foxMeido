@@ -26,7 +26,7 @@ import re
 from . import noco_config as cfg
 from . import noco_utils as utils
 from plugins.steam_utils import extract_steam_id
-from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
+from plugins.message_reaction import reaction_cleanup
 
 report = on_command("report", aliases={"report"}, priority=10, block=True)
 
@@ -53,12 +53,10 @@ def batch_update_records(records: list) -> tuple[int, int, list[str]]:
 
 @report.handle()
 async def handle_function(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    if group_id and message_id:
-        await send_reaction(bot, group_id, message_id)
+    cleanup = await reaction_cleanup(bot, event)
     arg_text = args.extract_plain_text().strip()
     if not arg_text:
+        if cleanup: await cleanup()
         await report.finish(
             "请输入游戏ID或Steam链接，格式：report 游戏ID"
         )
@@ -67,6 +65,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
     if not game_id and arg_text.isdigit():
         game_id = arg_text
     if not game_id:
+        if cleanup: await cleanup()
         await report.finish("无法识别游戏ID，请提供纯数字ID或Steam商店链接")
 
     await report.send(f"正在查询游戏ID为 {game_id} 的未报告记录...")
@@ -77,8 +76,10 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
     records_data = utils.get_records(url)
 
     if "error" in records_data:
+        if cleanup: await cleanup()
         await report.finish(f"查询失败: {records_data['error']}")
     if "list" not in records_data or not records_data["list"]:
+        if cleanup: await cleanup()
         await report.finish(f"游戏ID {game_id} 没有找到未报告（report=0）的记录")
 
     records = records_data["list"]
@@ -97,4 +98,5 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
         "详细信息：",
     ]
     lines.extend(details)
+    if cleanup: await cleanup()
     await report.finish("\r\n".join(lines))

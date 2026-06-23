@@ -37,7 +37,7 @@ from nonebot.log import logger
 from nonebot.exception import FinishedException
 
 from plugins.noco.noco_config import get_proxies
-from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
+from plugins.message_reaction import reaction_cleanup
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler  # noqa: E402
@@ -408,10 +408,7 @@ async def send_to_group(group_id: str, message: str) -> None:
 # ── 手动命令 ──────────────────────────────────────────────────────
 @curator_cmd.handle()
 async def handle_curator(bot, event):
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    if group_id and message_id:
-        await send_reaction(bot, group_id, message_id)
+    cleanup = await reaction_cleanup(bot, event)
 
     # 解析参数
     raw_msg = event.get_plaintext() if hasattr(event, "get_plaintext") else str(event)
@@ -419,6 +416,7 @@ async def handle_curator(bot, event):
     is_test = len(args) > 1 and args[1] == "test"
 
     if not is_configured():
+        if cleanup: await cleanup()
         await curator_cmd.finish("⚠️ 未配置 CURATOR_COOKIE 和 CURATOR_ID，请先设置 .env")
 
     if is_test:
@@ -435,11 +433,13 @@ async def handle_curator(bot, event):
         ntfy_topic = cfg.get("ntfy_topic", "")
         if ntfy_topic:
             ok = send_ntfy("🧪 测试推送", f"鉴赏家 {cfg['curator_name']} 测试消息", ntfy_topic)
+            if cleanup: await cleanup()
             await curator_cmd.finish(
                 f"ntfy 推送{'✅ 成功' if ok else '❌ 失败'}",
                 at_sender=False,
             )
         else:
+            if cleanup: await cleanup()
             await curator_cmd.finish("ntfy 未配置，仅发送了 QQ 消息", at_sender=False)
 
     # 执行检查（不再发"正在检查"，✅表情即为响应）
@@ -447,13 +447,16 @@ async def handle_curator(bot, event):
         result = run_check()
         cfg = get_config()
         msg = format_result(result, cfg["curator_name"])
+        if cleanup: await cleanup()
         await curator_cmd.finish(msg, at_sender=False)
     except requests.RequestException as e:
+        if cleanup: await cleanup()
         await curator_cmd.finish(f"❌ 网络请求失败: {e}", at_sender=False)
     except FinishedException:
         raise
     except Exception as e:
         logger.exception("检查异常")
+        if cleanup: await cleanup()
         await curator_cmd.finish(f"❌ 检查异常: {e}", at_sender=False)
 
 

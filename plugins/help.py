@@ -1,14 +1,11 @@
 from nonebot import on_startswith
-from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
+from plugins.message_reaction import reaction_cleanup
 
 help = on_startswith("help", ignorecase=False, priority=20, block=True)
 
 @help.handle()
 async def handle_function(bot, event):
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    if group_id and message_id:
-        await send_reaction(bot, group_id, message_id)
+    cleanup = await reaction_cleanup(bot, event)
     text = (
         "📖 可用命令\n\n"
         "━━━ Steam ━━━━━━━━━━━━━━━\n"
@@ -41,4 +38,5 @@ async def handle_function(bot, event):
         "━━━━━━━━━━━━━━━━━━━━━━━\n"
         "💡 直接发 Steam 商店链接也会自动查详情"
     )
+    if cleanup: await cleanup()
     await help.finish(text)

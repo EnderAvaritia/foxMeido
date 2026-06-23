@@ -18,7 +18,7 @@ from nonebot.rule import to_me
 from plugins.noco.noco_config import get_proxies
 from plugins.playwright_utils import take_app_screenshot
 from plugins.noco.error_logger import log_error
-from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
+from plugins.message_reaction import reaction_cleanup
 
 
 steamGoods = on_command("steamGoods", rule=to_me(), aliases={"steam", "查商店", "id"}, priority=10, block=True)
@@ -27,14 +27,14 @@ steamGoods = on_command("steamGoods", rule=to_me(), aliases={"steam", "查商店
 @steamGoods.handle()
 
 async def handle_function(bot, event, args: Message = CommandArg()):
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    if group_id and message_id:
-        await send_reaction(bot, group_id, message_id)
-    goodIds = args.extract_plain_text()
-    goodIds = goodIds.split()
-    for goodId in goodIds:
-        await send_message(goodId)
+    cleanup = await reaction_cleanup(bot, event)
+    try:
+        goodIds = args.extract_plain_text()
+        goodIds = goodIds.split()
+        for goodId in goodIds:
+            await send_message(goodId)
+    finally:
+        if cleanup: await cleanup()
 
 
 async def send_message(goodId):

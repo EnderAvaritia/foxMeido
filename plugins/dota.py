@@ -14,16 +14,13 @@ from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
 from plugins.noco.error_logger import log_error
-from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
+from plugins.message_reaction import reaction_cleanup
 
 dota = on_command("dota", rule=to_me(), aliases={"dota"}, priority=10, block=True)
 
 @dota.handle()
 async def handle_function(bot, event, messages: Message = CommandArg()):
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    if group_id and message_id:
-        await send_reaction(bot, group_id, message_id)
+    cleanup = await reaction_cleanup(bot, event)
     
     messages = messages.extract_plain_text()
     messages = messages.split()
@@ -42,6 +39,7 @@ async def handle_function(bot, event, messages: Message = CommandArg()):
         await dota.send(pic)
     else:
         await dota.send("检查你发了什么")
+    if cleanup: await cleanup()
     
 async def take_screenshot(args: str):
     async with async_playwright() as p:

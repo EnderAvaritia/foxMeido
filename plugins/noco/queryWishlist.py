@@ -8,7 +8,7 @@ import re
 from . import noco_config as cfg
 from . import noco_utils as utils
 from plugins.steam_utils import extract_steam_id
-from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
+from plugins.message_reaction import reaction_cleanup
 
 queryWishlist = on_command("queryWishlist", aliases={"queryWishlist","queryWish","qwish"}, priority=10, block=True)
 
@@ -34,12 +34,10 @@ def format_wishlist_response(data: dict) -> str:
 
 @queryWishlist.handle()
 async def handle_function(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    if group_id and message_id:
-        await send_reaction(bot, group_id, message_id)
+    cleanup = await reaction_cleanup(bot, event)
     input_text = args.extract_plain_text().strip()
     if not input_text:
+        if cleanup: await cleanup()
         await queryWishlist.finish("请输入游戏ID，格式: queryWishlist [gameId]")
 
     game_id = extract_steam_id(input_text) or input_text
@@ -47,4 +45,5 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
     url = cfg.url_with_filter(cfg.WISHLIST_TABLE_ID, f"(gameId,eq,{game_id})", sort="submitTime")
     records_data = utils.get_records(url)
     output = format_wishlist_response(records_data)
+    if cleanup: await cleanup()
     await queryWishlist.finish(output)

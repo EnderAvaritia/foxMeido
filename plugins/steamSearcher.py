@@ -9,7 +9,7 @@ from nonebot.rule import to_me
 from plugins.noco.noco_config import get_http_proxy
 from plugins.playwright_utils import take_app_screenshot
 from plugins.noco.error_logger import log_error
-from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
+from plugins.message_reaction import reaction_cleanup
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_alconna import Alconna, Args, Match, UniMessage, on_alconna  # noqa: E402
@@ -27,10 +27,8 @@ steam_searcher = on_alconna(
 
 @steam_searcher.handle()
 async def handle_function(bot, event, name: Match[str]):
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    if group_id and message_id:
-        await send_reaction(bot, group_id, message_id)
+    cleanup = await reaction_cleanup(bot, event)
+    steam_searcher.set_path_arg("_reaction_cleanup", cleanup)
     if name.available:
         # 如果参数已经提供，直接处理
         steam_searcher.set_path_arg("name", name.result)
@@ -42,14 +40,15 @@ async def handle_function(bot, event, name: Match[str]):
 
 @steam_searcher.got_path("name", prompt="请输入要搜索的游戏名称")
 async def send_message(name: str):
+    cleanup = steam_searcher.get_path_arg("_reaction_cleanup", None)
     print(name)
     if name and name.strip():  # 更严格的空值检查
-        await get_message(name)
+        await get_message(name, cleanup)
     else:
         print("no_match")
         await steam_searcher.send("oh!NO!")
 
-async def get_message(name):
+async def get_message(name, cleanup=None):
     headers = {
         'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:138.0) Gecko/20100101 Firefox/138.0",
         'Accept': "text/javascript, text/html, application/xml, text/xml, */*",
@@ -82,6 +81,7 @@ async def get_message(name):
         response = await client.get(url, headers=headers)
         if response.status_code != 200:
             print("请求失败")
+            if cleanup: await cleanup()
             await steam_searcher.finish("请求失败", at_sender=False)
 
         print("请求成功")
@@ -95,6 +95,7 @@ async def get_message(name):
     # 获取前5个游戏条目
     items = tree.xpath('//a[@data-gpnav="item"]')
     if not items or len(items) == 0:
+        if cleanup: await cleanup()
         await steam_searcher.finish("什么都找不到呢", at_sender=False)
         return
 
@@ -117,8 +118,10 @@ async def get_message(name):
 
 @steam_searcher.got_path("number", prompt="请选择要查看的游戏编号,输入0退出")
 async def get_choice(number: int):
+    cleanup = steam_searcher.get_path_arg("_reaction_cleanup", None)
     game_links = steam_searcher.get_path_arg("game_links", [])
     if number == 0:
+        if cleanup: await cleanup()
         await steam_searcher.finish("已退出")
     elif not game_links or number < 1 or number > len(game_links):
         await steam_searcher.reject("无效的选择，请重试", at_sender=False)
@@ -130,11 +133,14 @@ async def get_choice(number: int):
         appid_idx = parts.index("app")
         appid = parts[appid_idx + 1]
     except (ValueError, IndexError):
+        if cleanup: await cleanup()
         await steam_searcher.finish("无效的链接", at_sender=False)
         return
     screenshot_bytes = await take_app_screenshot(appid)
     if screenshot_bytes:
         pic = UniMessage.image(raw=screenshot_bytes)
+        if cleanup: await cleanup()
         await steam_searcher.finish(message=pic, at_sender=False)
     else:
+        if cleanup: await cleanup()
         await steam_searcher.finish("未能获取详情页面", at_sender=False)
