@@ -1,14 +1,23 @@
 """
 message_reaction.py - 消息表情回复模块
 
-提供 send_reaction 核心函数，各 handler 在触发成功后主动调用。
+提供 send_reaction 核心函数，以及 reaction_cleanup 便捷函数（自动添加 + 移除）。
 
 用法：
     # .env 中启用：
     MESSAGE_REACTION_ENABLED=true
     MESSAGE_REACTION_FACE_ID=32
 
-    # 在 handler 中调用：
+    # 在 handler 中调用（推荐——自动移除）：
+    from plugins.message_reaction import reaction_cleanup
+
+    cleanup = await reaction_cleanup(bot, event)
+    # ... 业务逻辑 ...
+    if cleanup:
+        await cleanup()
+    await matcher.finish("完成")
+
+    # 或使用底层函数（不移除）：
     from plugins.message_reaction import send_reaction, extract_group_id, extract_message_id
 
     group_id = extract_group_id(event)
@@ -79,15 +88,16 @@ def _read_dotenv(key: str) -> str:
     return os.getenv(key, "")
 
 
-def get_reaction_config() -> tuple[bool, str]:
+def get_reaction_config() -> tuple[bool, str, bool]:
     """获取表情回复配置。
 
     Returns:
-        (enabled, face_id): 是否启用，QQ 表情 ID
+        (enabled, face_id, auto_remove): 是否启用，QQ 表情 ID，处理结束后是否自动移除
     """
     enabled = _read_dotenv("MESSAGE_REACTION_ENABLED").lower() in ("true", "1", "yes")
     face_id = _read_dotenv("MESSAGE_REACTION_FACE_ID") or "32"
-    return enabled, face_id
+    auto_remove = _read_dotenv("MESSAGE_REACTION_AUTO_REMOVE").lower() in ("true", "1", "yes")
+    return enabled, face_id, auto_remove
 
 
 # ── 事件提取工具 ──────────────────────────────────────────────
@@ -163,13 +173,14 @@ async def send_reaction(
         return False
 
     if face_id is None:
-        _, face_id = get_reaction_config()
+        _, face_id, _ = get_reaction_config()
 
     try:
         await bot.call_api(
             "set_msg_emoji_like",
             message_id=str(message_id),
             emoji_id=str(face_id),
+            set=is_add,
         )
         action = "添加" if is_add else "移除"
         logger.opt(colors=True).debug(
@@ -201,3 +212,45 @@ async def remove_reaction(
 ) -> bool:
     """移除群消息表情回复（便捷函数）。"""
     return await send_reaction(bot, group_id, message_id, face_id=face_id, is_add=False)
+
+
+async def reaction_cleanup(
+    bot: Any,
+    event: Any,
+    face_id: str | None = None,
+):
+    """添加表情回应并返回移除函数。handler 在处理结束后调用移除函数即可。
+
+    是否自动移除受 .env 配置 MESSAGE_REACTION_AUTO_REMOVE 控制（默认 true）。
+
+    用法：:
+
+        cleanup = await reaction_cleanup(bot, event)
+        # ... 业务逻辑 ...
+        if cleanup:
+            await cleanup()
+        await matcher.finish("完成")
+
+    Args:
+        bot: NoneBot Bot 实例
+        event: 消息事件
+        face_id: QQ 表情 ID，为 None 使用 .env 默认值
+
+    Returns:
+        移除表情的 async callable，如果禁用自动移除或提取失败返回 None
+    """
+    group_id = extract_group_id(event)
+    message_id = extract_message_id(event)
+    if not group_id or not message_id:
+        return None
+
+    await send_reaction(bot, group_id, message_id, face_id)
+
+    _, _, auto_remove = get_reaction_config()
+    if not auto_remove:
+        return None
+
+    async def _remove():
+        await remove_reaction(bot, group_id, message_id, face_id)
+
+    return _remove
