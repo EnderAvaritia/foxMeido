@@ -17,8 +17,7 @@ from nonebot_plugin_alconna import Alconna, Args, Match, UniMessage, on_alconna 
 
 steam_searcher = on_alconna(
     Alconna("搜索steam游戏", Args["name?", str]["number?", int]),
-    rule=to_me(),
-    # rule=None, # 如果不想每次都@的话
+    rule=None, # 如果不想每次都@的话
     aliases={"find"},
     priority=10,
     block=True,
