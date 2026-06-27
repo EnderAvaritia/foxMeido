@@ -1,13 +1,14 @@
 """
 error_logger.py - 错误日志模块
 
+所有模块共用的错误日志工具。
 每次调用写一个时间戳文件到 logs/，方便回溯。
 
 log_error()  → logs/error_<时间戳>.log  （一般错误，如网络超时）
 log_crash()  → logs/crash_<时间戳>.log  （崩溃级错误，含 extra 上下文）
 
 用法：
-    from plugins.noco.error_logger import log_error, log_crash
+    from plugins.error_logger import log_error, log_crash
 
     # 一般错误
     try:
@@ -29,10 +30,8 @@ import traceback
 from datetime import datetime
 from typing import Any
 
-# 项目根目录定位：此文件位于 plugins/noco/，往上级 3 层
-_PROJECT_ROOT: str = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-)
+# 项目根目录定位：此文件位于 plugins/，往上级 1 层
+_PROJECT_ROOT: str = os.path.dirname(os.path.abspath(__file__))
 _LOG_DIR: str = os.path.join(_PROJECT_ROOT, "logs")
 os.makedirs(_LOG_DIR, exist_ok=True)
 

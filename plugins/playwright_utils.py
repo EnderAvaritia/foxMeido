@@ -14,7 +14,7 @@ from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 from plugins.noco.noco_config import get_http_proxy
-from plugins.noco.error_logger import log_error
+from plugins.error_logger import log_error
 
 # 全局浏览器实例（模块级缓存，只启动一次）
 _playwright = None

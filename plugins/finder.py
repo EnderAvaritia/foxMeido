@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
 from plugins.noco.noco_config import get_proxies, get_http_proxy
-from plugins.noco.error_logger import log_error
+from plugins.error_logger import log_error
 from plugins.message_reaction import reaction_cleanup
 
 finder = on_command("finder", rule=to_me(), aliases={"finder"}, priority=10, block=True)

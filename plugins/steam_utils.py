@@ -17,7 +17,7 @@ from typing import Any
 import requests
 
 from plugins.noco.noco_config import get_proxies
-from plugins.noco.error_logger import log_error
+from plugins.error_logger import log_error
 
 
 def get_game_info(appid: int | str) -> dict[str, Any]:

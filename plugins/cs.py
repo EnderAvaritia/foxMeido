@@ -13,7 +13,7 @@ import requests
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
-from plugins.noco.error_logger import log_error
+from plugins.error_logger import log_error
 from plugins.message_reaction import reaction_cleanup
 
 cs = on_command("cs", rule=to_me(), aliases={"cs"}, priority=10, block=True)

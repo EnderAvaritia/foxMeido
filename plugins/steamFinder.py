@@ -17,7 +17,7 @@ from nonebot.rule import to_me
 
 from plugins.noco.noco_config import get_proxies
 from plugins.playwright_utils import take_app_screenshot
-from plugins.noco.error_logger import log_error
+from plugins.error_logger import log_error
 from plugins.message_reaction import reaction_cleanup
 
 

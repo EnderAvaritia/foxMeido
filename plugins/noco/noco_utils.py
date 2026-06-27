@@ -13,7 +13,7 @@ from typing import Any
 import requests
 
 from .noco_config import request_kwargs, post_kwargs
-from .error_logger import log_error
+from plugins.error_logger import log_error
 
 
 # ── 通用 NocoDB 操作 ───────────────────────────────────────
