@@ -77,7 +77,7 @@ def get_headless() -> bool:
                             break
             except OSError:
                 pass
-    _headless_cache = raw.strip().lower() not in ("false", "0", "no", "")
+    _headless_cache = raw.strip().lower() not in ("false", "0", "no")
     return _headless_cache
 
 
