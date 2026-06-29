@@ -6,5 +6,10 @@
 /plugins/__pycache__
 /plugins/weather.py
 /logs/
+/log/
 /db/
 /cookies/*.json
+*.zip
+.omo/
+__pycache__/
+*.pyc
