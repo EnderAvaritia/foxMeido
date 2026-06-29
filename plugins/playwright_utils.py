@@ -9,6 +9,9 @@ playwright_utils.py - 共享 Playwright 工具
 
 from __future__ import annotations
 
+import json
+import os
+
 from playwright.async_api import async_playwright
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeout
@@ -19,6 +22,70 @@ from plugins.error_logger import log_error
 # 全局浏览器实例（模块级缓存，只启动一次）
 _playwright = None
 _browser = None
+
+# Playwright Cookie 文件路径（懒加载）
+_cookie_file_path: str | None = None
+
+
+def _get_cookie_file_path() -> str:
+    """读取 PLAYWRIGHT_COOKIE_FILE（os.environ → .env 兜底）。"""
+    global _cookie_file_path
+    if _cookie_file_path is not None:
+        return _cookie_file_path
+    value = os.getenv("PLAYWRIGHT_COOKIE_FILE", "")
+    if not value:
+        # .env 兜底
+        env_path = os.path.join(_project_root(), ".env")
+        if os.path.isfile(env_path):
+            try:
+                with open(env_path, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        if line.startswith("PLAYWRIGHT_COOKIE_FILE="):
+                            value = line[len("PLAYWRIGHT_COOKIE_FILE="):].strip().strip('"').strip("'")
+                            break
+            except OSError:
+                pass
+    _cookie_file_path = value
+    return _cookie_file_path
+
+
+def _project_root() -> str:
+    """获取项目根目录（此文件位于 plugins/ 下，往上级 1 层）。"""
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+async def load_cookie_file(context) -> None:
+    """
+    从 JSON 文件加载 Playwright cookie 到指定 context。
+
+    JSON 格式为数组，每项需包含 name / value / domain / path，
+    可选 httpOnly / secure / sameSite / expires。
+    参考 cookies/steam_playwright.json.example。
+
+    如果未配置 PLAYWRIGHT_COOKIE_FILE 或文件不存在，静默跳过。
+    """
+    cookie_file = _get_cookie_file_path()
+    if not cookie_file:
+        return
+    fpath = os.path.join(_project_root(), cookie_file)
+    if not os.path.isfile(fpath):
+        log_error("load_cookie_file", f"Cookie 文件不存在: {fpath}")
+        return
+    try:
+        with open(fpath, "r", encoding="utf-8") as f:
+            cookies = json.load(f)
+        if not isinstance(cookies, list):
+            log_error("load_cookie_file", f"Cookie 文件格式错误：需要 JSON 数组，得到 {type(cookies).__name__}")
+            return
+        await context.add_cookies(cookies)
+        print(f"[playwright] 已加载 {len(cookies)} 个 cookie")
+    except json.JSONDecodeError as e:
+        log_error("load_cookie_file", f"Cookie 文件 JSON 解析失败: {e}")
+    except Exception as e:
+        log_error("load_cookie_file", f"Cookie 加载异常: {e}")
 
 
 async def ensure_browser():
@@ -56,7 +123,7 @@ async def create_page(viewport_size: dict | None = None):
         if proxy:
             ctx_kwargs["proxy"] = {"server": proxy}
         context = await _browser.new_context(**ctx_kwargs)
-        await context.add_cookies(cookies=[])
+        await load_cookie_file(context)
         page = await context.new_page()
         if viewport_size:
             await page.set_viewport_size(viewport_size)

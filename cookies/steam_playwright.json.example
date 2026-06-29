@@ -1,0 +1,22 @@
+[
+    {
+        "name": "steamCountry",
+        "value": "HK%7Cea2d9f76120cb03b94970e70a6950a58",
+        "domain": "store.steampowered.com",
+        "path": "/"
+    },
+    {
+        "name": "sessionid",
+        "value": "117e091397945d4842aa9d74",
+        "domain": "store.steampowered.com",
+        "path": "/"
+    },
+    {
+        "name": "steamLoginSecure",
+        "value": "76561198763426534%7C%7Cey...",
+        "domain": "store.steampowered.com",
+        "path": "/",
+        "httpOnly": true,
+        "secure": true
+    }
+]
