@@ -14,6 +14,7 @@ auto_pull.py - 自动拉取仓库更新插件
   GIT_AUTO_PULL_SCHEDULE_TYPE=both     # cron / interval / both（默认 both）
   GIT_AUTO_PULL_NOTIFY_GROUP=          # 拉取结果通知的目标群号（可选）
   GIT_AUTO_PULL_REMOTE=origin          # 远程仓库名（默认 origin）
+  GIT_AUTO_PULL_GIT_PATH=git           # git 可执行文件路径（默认 git，用绝对路径如 C:/Program Files/Git/bin/git.exe）
   GIT_AUTO_PULL_BRANCH=                # 目标分支（留空则自动检测当前分支）
 """
 
@@ -41,6 +42,9 @@ from nonebot_plugin_apscheduler import scheduler  # noqa: E402
 # ── 常量 ──────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
 CST = timezone(timedelta(hours=8))
+
+# 在 get_config() 后由模块初始化时更新
+_GIT_EXECUTABLE: str = "git"
 
 
 # ── 配置读取 ──────────────────────────────────────────────────────
@@ -79,6 +83,7 @@ def get_config() -> dict[str, Any]:
     schedule_type = (_read_dotenv("GIT_AUTO_PULL_SCHEDULE_TYPE") or "both").lower()
     notify_group = _read_dotenv("GIT_AUTO_PULL_NOTIFY_GROUP")
     remote = _read_dotenv("GIT_AUTO_PULL_REMOTE") or "origin"
+    git_path = _read_dotenv("GIT_AUTO_PULL_GIT_PATH") or "git"
     branch = _read_dotenv("GIT_AUTO_PULL_BRANCH") or ""
 
     try:
@@ -96,6 +101,7 @@ def get_config() -> dict[str, Any]:
         "schedule_type": schedule_type,
         "notify_group": notify_group,
         "remote": remote,
+        "git_path": git_path,
         "branch": branch,
     }
 
@@ -105,7 +111,7 @@ def _git(*args: str, timeout: int = 60) -> tuple[str, str, int]:
     """执行 git 命令，返回 (stdout, stderr, returncode)。"""
     try:
         result = subprocess.run(
-            ["git"] + list(args),
+            [_GIT_EXECUTABLE] + list(args),
             capture_output=True,
             text=True,
             cwd=str(BASE_DIR),
@@ -115,7 +121,7 @@ def _git(*args: str, timeout: int = 60) -> tuple[str, str, int]:
     except subprocess.TimeoutExpired:
         return "", "git 命令超时", -1
     except FileNotFoundError:
-        return "", "git 未安装或不在 PATH 中", -1
+        return "", f"git 未找到: {_GIT_EXECUTABLE}，请检查 GIT_AUTO_PULL_GIT_PATH", -1
     except OSError as e:
         return "", f"执行 git 失败: {e}", -1
 
@@ -329,6 +335,9 @@ def _parse_time(time_str: str) -> tuple[int, int]:
 
 # ── 插件初始化 ────────────────────────────────────────────────────
 _cfg = get_config()
+
+# 设置 git 可执行文件路径
+_GIT_EXECUTABLE = _cfg["git_path"]
 
 if _cfg["enabled"]:
     _schedule_type = _cfg["schedule_type"]
