@@ -87,6 +87,29 @@ COMMAND_START=[""]
 | `STEAM_COOKIE` | Steam **商店页面** Cookie，`wish` 功能需要。从浏览器访问 store.steampowered.com → F12 → 复制请求头 `Cookie:` 整行。格式：`sessionid=xxx; steamLogin=xxx; ...` |
 | `CURATOR_ID` | Steam 鉴赏家 ID（unreported 功能需要） |
 
+### Playwright（可选）
+
+Playwright 用于 Steam 页面截图（`steamGoods`、`pub` 等命令）。
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `PLAYWRIGHT_HEADLESS` | `true` | 无头模式。设为 `false` 可在调试时看到浏览器窗口 |
+| `PLAYWRIGHT_COOKIE_FILE` | — | Playwright 格式的 Cookie 文件路径（JSON），用于登录态截图。参考 `cookies/steam_playwright.json.example` |
+
+**获取 Playwright Cookie：**
+
+```bash
+python scripts/get_steam_cookies.py
+```
+
+弹出浏览器 → 手动登录 Steam → 回车 → cookie 自动写入 `cookies/steam_playwright.json`。然后在 `.env` 中添加：
+
+```env
+PLAYWRIGHT_COOKIE_FILE=cookies/steam_playwright.json
+```
+
+> Playwright 的 cookie 格式与 `STEAM_COOKIE`（requests 用）不通用，需要单独的文件。`STEAM_COOKIE` 用于 wish 命令，`PLAYWRIGHT_COOKIE_FILE` 用于截图功能。
+
 ### 鉴赏家副本监控（可选）
 
 监控 Steam 鉴赏家后台的待处理游戏副本邀请，有新副本到达时通过 QQ 群消息（和/或 ntfy）推送通知。
@@ -163,6 +186,10 @@ Steam 商店链接会自动触发查询（如发送 `https://store.steampowered.
 foxMeido/
 ├── .env.example          # 配置模板
 ├── pyproject.toml        # NoneBot 项目配置
+├── scripts/              # 工具脚本
+│   └── get_steam_cookies.py  # 获取 Playwright 格式的 Steam cookie
+├── cookies/              # Playwright cookie 文件（gitignore）
+│   └── steam_playwright.json.example  # cookie 格式模板
 ├── logs/                 # 错误日志（自动创建）
 └── plugins/
     ├── steam_utils.py    # Steam 通用工具
