@@ -25,6 +25,8 @@ _browser = None
 
 # Playwright Cookie 文件路径（懒加载）
 _cookie_file_path: str | None = None
+# 无头模式缓存（懒加载）
+_headless_cache: bool | None = None
 
 
 def _get_cookie_file_path() -> str:
@@ -50,6 +52,33 @@ def _get_cookie_file_path() -> str:
                 pass
     _cookie_file_path = value
     return _cookie_file_path
+
+
+def get_headless() -> bool:
+    """
+    读取 PLAYWRIGHT_HEADLESS（os.environ → .env 兜底）。
+    默认 True（无头模式），设为 false 可看到浏览器窗口用于调试。
+    """
+    global _headless_cache
+    if _headless_cache is not None:
+        return _headless_cache
+    raw = os.getenv("PLAYWRIGHT_HEADLESS", "")
+    if not raw:
+        env_path = os.path.join(_project_root(), ".env")
+        if os.path.isfile(env_path):
+            try:
+                with open(env_path, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        if line.startswith("PLAYWRIGHT_HEADLESS="):
+                            raw = line[len("PLAYWRIGHT_HEADLESS="):].strip().strip('"').strip("'")
+                            break
+            except OSError:
+                pass
+    _headless_cache = raw.strip().lower() not in ("false", "0", "no", "")
+    return _headless_cache
 
 
 def _project_root() -> str:
@@ -95,7 +124,7 @@ async def ensure_browser():
         return True
     try:
         _playwright = await async_playwright().start()
-        _browser = await _playwright.chromium.launch(headless=True)
+        _browser = await _playwright.chromium.launch(headless=get_headless())
         return True
     except Exception as e:
         log_error("ensure_browser", f"浏览器启动失败: {e}")

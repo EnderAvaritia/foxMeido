@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
 from plugins.noco.noco_config import get_proxies, get_http_proxy
+from plugins.playwright_utils import get_headless
 from plugins.error_logger import log_error
 from plugins.message_reaction import reaction_cleanup
 
@@ -73,7 +74,7 @@ async def take_screenshot(url: str):
             if proxy:
                 ctx_kwargs["proxy"] = {"server": proxy}
             
-            browser = await p.chromium.launch(headless=False, slow_mo=1000)
+            browser = await p.chromium.launch(headless=get_headless(), slow_mo=1000)
             context = await browser.new_context(**ctx_kwargs)
             page = await context.new_page()
             print("new")

@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
 from plugins.error_logger import log_error
+from plugins.playwright_utils import get_headless
 from plugins.message_reaction import reaction_cleanup
 
 dota = on_command("dota", rule=to_me(), aliases={"dota"}, priority=10, block=True)
@@ -47,7 +48,7 @@ async def take_screenshot(args: str):
         print(args)
 
         try:
-            browser = await p.chromium.launch(headless=True)
+            browser = await p.chromium.launch(headless=get_headless())
             context = await browser.new_context()
             page = await context.new_page()
             await page.set_viewport_size(({"width": 800, "height": 19200}))

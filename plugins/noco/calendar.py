@@ -15,7 +15,7 @@ from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 from . import noco_config as cfg
-from plugins.playwright_utils import load_cookie_file
+from plugins.playwright_utils import load_cookie_file, get_headless
 from plugins.message_reaction import reaction_cleanup
 
 
@@ -27,7 +27,7 @@ async def init_playwright():
     global browser, page
     if browser is None:
         playwright = await async_playwright().start()
-        browser = await playwright.chromium.launch(headless=True)
+        browser = await playwright.chromium.launch(headless=get_headless())
 
         # playwright 的 cookie 严格区分站点，使用共享函数从文件加载
         context = await browser.new_context(proxy={"server": cfg.HTTP_PROXY})
