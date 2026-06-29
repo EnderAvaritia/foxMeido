@@ -13,6 +13,7 @@ auto_pull.py - 自动拉取仓库更新插件
   GIT_AUTO_PULL_TIME=06:00             # 定时模式：每天检查时间（HH:MM）
   GIT_AUTO_PULL_SCHEDULE_TYPE=both     # cron / interval / both（默认 both）
   GIT_AUTO_PULL_NOTIFY_GROUP=          # 拉取结果通知的目标群号（可选）
+  GIT_AUTO_PULL_REMOTE=origin          # 远程仓库名（默认 origin）
   GIT_AUTO_PULL_BRANCH=                # 目标分支（留空则自动检测当前分支）
 """
 
@@ -77,6 +78,7 @@ def get_config() -> dict[str, Any]:
     check_time = _read_dotenv("GIT_AUTO_PULL_TIME") or "06:00"
     schedule_type = (_read_dotenv("GIT_AUTO_PULL_SCHEDULE_TYPE") or "both").lower()
     notify_group = _read_dotenv("GIT_AUTO_PULL_NOTIFY_GROUP")
+    remote = _read_dotenv("GIT_AUTO_PULL_REMOTE") or "origin"
     branch = _read_dotenv("GIT_AUTO_PULL_BRANCH") or ""
 
     try:
@@ -93,6 +95,7 @@ def get_config() -> dict[str, Any]:
         "check_time": check_time,
         "schedule_type": schedule_type,
         "notify_group": notify_group,
+        "remote": remote,
         "branch": branch,
     }
 
@@ -123,24 +126,24 @@ def get_current_branch() -> str:
     return stdout if rc == 0 else ""
 
 
-def get_remote_url() -> str:
+def get_remote_url(remote: str) -> str:
     """获取远程仓库 URL。"""
-    stdout, _, rc = _git("remote", "get-url", "origin")
+    stdout, _, rc = _git("remote", "get-url", remote)
     return stdout if rc == 0 else ""
 
 
-def git_fetch(branch: str) -> bool:
+def git_fetch(remote: str, branch: str) -> bool:
     """git fetch 远程，返回是否成功。"""
-    stdout, stderr, rc = _git("fetch", "origin", branch)
+    stdout, stderr, rc = _git("fetch", remote, branch)
     if rc != 0:
         logger.warning("git fetch 失败: %s", stderr)
         return False
     return True
 
 
-def count_behind(branch: str) -> int:
+def count_behind(remote: str, branch: str) -> int:
     """获取落后远程的 commit 数。"""
-    stdout, stderr, rc = _git("rev-list", "--count", f"HEAD..origin/{branch}")
+    stdout, stderr, rc = _git("rev-list", "--count", f"HEAD..{remote}/{branch}")
     if rc == 0 and stdout.isdigit():
         return int(stdout)
     return 0
@@ -154,11 +157,12 @@ def has_local_changes() -> bool:
     return False
 
 
-def git_pull(branch: str, force: bool = False) -> tuple[bool, str]:
+def git_pull(remote: str, branch: str, force: bool = False) -> tuple[bool, str]:
     """
     执行 git pull。
 
     Args:
+        remote: 远程仓库名。
         branch: 目标分支。
         force: 是否强制拉取（丢弃本地更改）。
 
@@ -173,19 +177,19 @@ def git_pull(branch: str, force: bool = False) -> tuple[bool, str]:
         )
 
     # fetch
-    if not git_fetch(branch):
+    if not git_fetch(remote, branch):
         return False, "git fetch 失败，请检查网络连接"
 
     # 检查落后 commit 数
-    behind = count_behind(branch)
+    behind = count_behind(remote, branch)
     if behind == 0:
         return False, "已经是最新"
 
     # force 模式下先 reset
     if force:
-        _git("reset", "--hard", f"origin/{branch}")
+        _git("reset", "--hard", f"{remote}/{branch}")
     else:
-        stdout, stderr, rc = _git("pull", "origin", branch)
+        stdout, stderr, rc = _git("pull", remote, branch)
         if rc != 0:
             return False, f"git pull 失败: {stderr}"
 
@@ -245,10 +249,11 @@ async def run_pull(force: bool = False) -> str:
         给用户的消息文本。
     """
     cfg = get_config()
+    remote = cfg["remote"]
     branch = cfg["branch"] or get_current_branch() or "main"
 
-    logger.info("检查仓库更新 (branch=%s, force=%s)", branch, force)
-    has_update, msg = git_pull(branch, force=force)
+    logger.info("检查仓库更新 (remote=%s, branch=%s, force=%s)", remote, branch, force)
+    has_update, msg = git_pull(remote, branch, force=force)
 
     if has_update:
         # 异步触发延迟重启
@@ -295,8 +300,9 @@ async def scheduled_pull():
 
     logger.info("定时拉取检查：开始执行")
     try:
+        remote = cfg["remote"]
         branch = cfg["branch"] or get_current_branch() or "main"
-        has_update, msg = git_pull(branch, force=False)
+        has_update, msg = git_pull(remote, branch, force=False)
 
         if has_update:
             full_msg = f"🔄 自动更新: {msg}\n\n⚠️ 机器人将在 3 秒后重启"
