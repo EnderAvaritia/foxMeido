@@ -44,12 +44,12 @@ from nonebot_plugin_apscheduler import scheduler  # noqa: E402
 BASE_DIR = Path(__file__).resolve().parent.parent
 CST = timezone(timedelta(hours=8))
 
-# 在 get_config() 后由模块初始化时更新
+# 在 getConfig() 后由模块初始化时更新
 _GIT_EXECUTABLE: str = "git"
 
 
 # ── 配置读取 ──────────────────────────────────────────────────────
-def _read_dotenv(key: str) -> str:
+def _readDotenv(key: str) -> str:
     """从 os.environ 或 .env 文件读配置。"""
     val = os.environ.get(key, "")
     if val:
@@ -76,17 +76,17 @@ def _read_dotenv(key: str) -> str:
     return ""
 
 
-def get_config() -> dict[str, Any]:
+def getConfig() -> dict[str, Any]:
     """读取插件所需的所有配置项。"""
-    enabled = _read_dotenv("GIT_AUTO_PULL_ENABLED") in ("true", "1", "yes")
-    interval_str = _read_dotenv("GIT_AUTO_PULL_INTERVAL") or "30"
-    check_time = _read_dotenv("GIT_AUTO_PULL_TIME") or "06:00"
-    schedule_type = (_read_dotenv("GIT_AUTO_PULL_SCHEDULE_TYPE") or "both").lower()
-    notify_group = _read_dotenv("GIT_AUTO_PULL_NOTIFY_GROUP")
-    remote = _read_dotenv("GIT_AUTO_PULL_REMOTE") or "origin"
-    git_path = _read_dotenv("GIT_AUTO_PULL_GIT_PATH") or "git"
-    restart_cmd = _read_dotenv("GIT_AUTO_PULL_RESTART_CMD") or ""
-    branch = _read_dotenv("GIT_AUTO_PULL_BRANCH") or ""
+    enabled = _readDotenv("GIT_AUTO_PULL_ENABLED") in ("true", "1", "yes")
+    interval_str = _readDotenv("GIT_AUTO_PULL_INTERVAL") or "30"
+    check_time = _readDotenv("GIT_AUTO_PULL_TIME") or "06:00"
+    schedule_type = (_readDotenv("GIT_AUTO_PULL_SCHEDULE_TYPE") or "both").lower()
+    notify_group = _readDotenv("GIT_AUTO_PULL_NOTIFY_GROUP")
+    remote = _readDotenv("GIT_AUTO_PULL_REMOTE") or "origin"
+    git_path = _readDotenv("GIT_AUTO_PULL_GIT_PATH") or "git"
+    restart_cmd = _readDotenv("GIT_AUTO_PULL_RESTART_CMD") or ""
+    branch = _readDotenv("GIT_AUTO_PULL_BRANCH") or ""
 
     try:
         interval = int(interval_str)
@@ -129,25 +129,25 @@ def _git(*args: str, timeout: int = 60) -> tuple[str, str, int]:
         return "", f"执行 git 失败: {e}", -1
 
 
-def _is_url(value: str) -> bool:
+def _isUrl(value: str) -> bool:
     """判断字符串是 URL 还是 remote 名称。"""
     return "://" in value or value.startswith("git@")
 
 
-def _fetch_ref(remote: str, branch: str) -> str:
+def _fetchRef(remote: str, branch: str) -> str:
     """返回 fetch 后可用的 ref（URL 模式用 FETCH_HEAD，remote 模式用 remote/branch）。"""
-    if _is_url(remote):
+    if _isUrl(remote):
         return "FETCH_HEAD"
     return f"{remote}/{branch}"
 
 
-def get_current_branch() -> str:
+def getCurrentBranch() -> str:
     """获取当前分支名。"""
     stdout, _, rc = _git("rev-parse", "--abbrev-ref", "HEAD")
     return stdout if rc == 0 else ""
 
 
-def git_fetch(remote: str, branch: str) -> bool:
+def gitFetch(remote: str, branch: str) -> bool:
     """git fetch 远程（支持 remote 名称或 URL），返回是否成功。"""
     stdout, stderr, rc = _git("fetch", remote, branch)
     if rc != 0:
@@ -156,16 +156,16 @@ def git_fetch(remote: str, branch: str) -> bool:
     return True
 
 
-def count_behind(remote: str, branch: str) -> int:
+def countBehind(remote: str, branch: str) -> int:
     """获取落后远程的 commit 数（支持 remote 名称或 URL）。"""
-    ref = _fetch_ref(remote, branch)
+    ref = _fetchRef(remote, branch)
     stdout, stderr, rc = _git("rev-list", "--count", f"HEAD..{ref}")
     if rc == 0 and stdout.isdigit():
         return int(stdout)
     return 0
 
 
-def has_local_changes() -> bool:
+def hasLocalChanges() -> bool:
     """检查是否有未提交的本地更改。"""
     stdout, _, rc = _git("status", "--porcelain")
     if rc == 0 and stdout:
@@ -173,7 +173,7 @@ def has_local_changes() -> bool:
     return False
 
 
-def git_pull(remote: str, branch: str, force: bool = False) -> tuple[bool, str]:
+def gitPull(remote: str, branch: str, force: bool = False) -> tuple[bool, str]:
     """
     执行 git pull。
 
@@ -186,22 +186,22 @@ def git_pull(remote: str, branch: str, force: bool = False) -> tuple[bool, str]:
         (是否有更新, 消息字符串)
     """
     # 如有本地更改且非 force 模式，放弃
-    if has_local_changes() and not force:
+    if hasLocalChanges() and not force:
         return (
             False,
             "存在未提交的本地更改，请先 commit/stash 或使用「update force」强制拉取",
         )
 
     # fetch
-    if not git_fetch(remote, branch):
+    if not gitFetch(remote, branch):
         return False, "git fetch 失败，请检查网络连接"
 
     # 检查落后 commit 数
-    behind = count_behind(remote, branch)
+    behind = countBehind(remote, branch)
     if behind == 0:
         return False, "已经是最新"
 
-    ref = _fetch_ref(remote, branch)
+    ref = _fetchRef(remote, branch)
 
     # force 模式下先 reset
     if force:
@@ -225,14 +225,14 @@ def git_pull(remote: str, branch: str, force: bool = False) -> tuple[bool, str]:
 
 
 # ── 机器人重启 ────────────────────────────────────────────────────
-def _restart_via_execv() -> None:
+def _restartViaExecv() -> None:
     """方式 A：os.execv 替换当前进程（Linux 上工作良好，Windows 不推荐）。"""
     logger.info("通过 os.execv 重启...")
     args = [sys.executable, "-m", "nb_cli", "run"]
     os.execv(sys.executable, args)
 
 
-def _restart_via_command(cmd: str) -> None:
+def _restartViaCommand(cmd: str) -> None:
     """方式 B：执行自定义命令后退出当前进程。"""
     import shlex
 
@@ -246,29 +246,29 @@ def _restart_via_command(cmd: str) -> None:
     os._exit(0)
 
 
-def restart_bot() -> None:
+def restartBot() -> None:
     """根据配置选择重启方式。"""
-    cfg = get_config()
+    cfg = getConfig()
     cmd = cfg.get("restart_cmd", "").strip()
     if cmd:
-        _restart_via_command(cmd)
+        _restartViaCommand(cmd)
     else:
         try:
-            _restart_via_execv()
+            _restartViaExecv()
         except Exception as e:
             logger.error("os.execv 重启失败，退出进程: %s", e)
             os._exit(1)
 
 
-async def restart_with_delay(delay: int = 3) -> None:
+async def restartWithDelay(delay: int = 3) -> None:
     """延迟后重启机器人，确保响应消息发送完毕。"""
     logger.info("将在 %d 秒后重启...", delay)
     await asyncio.sleep(delay)
-    restart_bot()
+    restartBot()
 
 
 # ── 消息发送 ──────────────────────────────────────────────────────
-async def send_to_group(group_id: str, message: str) -> None:
+async def sendToGroup(group_id: str, message: str) -> None:
     """向指定 QQ 群发送消息。"""
     try:
         bot = get_bot()
@@ -277,32 +277,32 @@ async def send_to_group(group_id: str, message: str) -> None:
         logger.error("发送群消息失败 (group=%s): %s", group_id, e)
 
 
-async def send_notification(message: str) -> None:
+async def sendNotification(message: str) -> None:
     """如果有配置通知群，发送通知。"""
-    cfg = get_config()
+    cfg = getConfig()
     group = cfg["notify_group"]
     if group:
-        await send_to_group(group, message)
+        await sendToGroup(group, message)
 
 
 # ── 核心检查逻辑 ──────────────────────────────────────────────────
-async def run_pull(force: bool = False) -> str:
+async def runPull(force: bool = False) -> str:
     """
     执行一次完整的 pull 检查流程。
 
     Returns:
         给用户的消息文本。
     """
-    cfg = get_config()
+    cfg = getConfig()
     remote = cfg["remote"]
-    branch = cfg["branch"] or get_current_branch() or "main"
+    branch = cfg["branch"] or getCurrentBranch() or "main"
 
     logger.info("检查仓库更新 (remote=%s, branch=%s, force=%s)", remote, branch, force)
-    has_update, msg = git_pull(remote, branch, force=force)
+    has_update, msg = gitPull(remote, branch, force=force)
 
     if has_update:
         # 异步触发延迟重启
-        asyncio.ensure_future(restart_with_delay(delay=3))
+        asyncio.ensure_future(restartWithDelay(delay=3))
         result = f"🔄 {msg}\n\n⚠️ 机器人将在 3 秒后自动重启以加载更新"
     else:
         result = f"✅ {msg}"
@@ -315,7 +315,7 @@ update_cmd = on_command("update", aliases={"pull"}, priority=20, block=True)
 
 
 @update_cmd.handle()
-async def handle_update(bot, event):
+async def handleUpdate(bot, event):
     """手动触发 git pull 并重启。"""
     cleanup = await reaction_cleanup(bot, event)
 
@@ -325,7 +325,7 @@ async def handle_update(bot, event):
     force = len(args) > 1 and args[1] == "force"
 
     try:
-        msg = await run_pull(force=force)
+        msg = await runPull(force=force)
         if cleanup:
             await cleanup()
         await update_cmd.finish(msg, at_sender=False)
@@ -337,34 +337,34 @@ async def handle_update(bot, event):
 
 
 # ── 定时任务 ──────────────────────────────────────────────────────
-async def scheduled_pull():
+async def scheduledPull():
     """定时任务：检查更新并推送通知。"""
-    cfg = get_config()
+    cfg = getConfig()
     if not cfg["enabled"]:
         return
 
     logger.info("定时拉取检查：开始执行")
     try:
         remote = cfg["remote"]
-        branch = cfg["branch"] or get_current_branch() or "main"
-        has_update, msg = git_pull(remote, branch, force=False)
+        branch = cfg["branch"] or getCurrentBranch() or "main"
+        has_update, msg = gitPull(remote, branch, force=False)
 
         if has_update:
             full_msg = f"🔄 自动更新: {msg}\n\n⚠️ 机器人将在 3 秒后重启"
             logger.info("定时拉取到更新，即将重启")
             # 通知群（如配置）
-            await send_notification(full_msg)
+            await sendNotification(full_msg)
             # 重启
-            await restart_with_delay(delay=3)
+            await restartWithDelay(delay=3)
         else:
             logger.info("定时拉取检查完成: %s", msg)
     except Exception as e:
         logger.exception("定时拉取检查异常: %s", e)
-        await send_notification(f"❌ 自动拉取检查异常: {e}")
+        await sendNotification(f"❌ 自动拉取检查异常: {e}")
 
 
 # ── 解析定时时间 ──────────────────────────────────────────────────
-def _parse_time(time_str: str) -> tuple[int, int]:
+def _parseTime(time_str: str) -> tuple[int, int]:
     """解析 'HH:MM' 格式的时间字符串。"""
     parts = time_str.strip().split(":")
     hour = int(parts[0])
@@ -373,14 +373,14 @@ def _parse_time(time_str: str) -> tuple[int, int]:
 
 
 # ── 插件初始化 ────────────────────────────────────────────────────
-_cfg = get_config()
+_cfg = getConfig()
 
 # 设置 git 可执行文件路径
 _GIT_EXECUTABLE = _cfg["git_path"]
 
 if _cfg["enabled"]:
     _schedule_type = _cfg["schedule_type"]
-    _branch = _cfg["branch"] or get_current_branch() or "main"
+    _branch = _cfg["branch"] or getCurrentBranch() or "main"
 
     logger.info(
         "自动拉取已启用: schedule=%s, interval=%dmin, time=%s, branch=%s",
@@ -389,9 +389,9 @@ if _cfg["enabled"]:
 
     # 定时模式（每天固定时间）
     if _schedule_type in ("cron", "both"):
-        _hour, _minute = _parse_time(_cfg["check_time"])
+        _hour, _minute = _parseTime(_cfg["check_time"])
         scheduler.add_job(
-            scheduled_pull,
+            scheduledPull,
             "cron",
             hour=_hour,
             minute=_minute,
@@ -404,7 +404,7 @@ if _cfg["enabled"]:
     # 间隔模式（每 N 分钟）
     if _schedule_type in ("interval", "both"):
         scheduler.add_job(
-            scheduled_pull,
+            scheduledPull,
             "interval",
             minutes=_cfg["interval"],
             id="auto_pull_interval",
