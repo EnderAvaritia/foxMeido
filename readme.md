@@ -130,22 +130,6 @@ PLAYWRIGHT_COOKIE_FILE=cookies/steam_playwright.json
 | `pending` | 手动触发一次检查，结果发送到当前群 |
 | `pending test` | 发送测试推送（QQ 消息 + ntfy 如有配置） |
 
-### 自动拉取仓库更新（可选）
-
-定时或手动执行 `git pull`，检测到新提交后自动重启机器人以加载新代码。
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `GIT_AUTO_PULL_ENABLED` | `false` | 是否启用自动检查 |
-| `GIT_AUTO_PULL_INTERVAL` | `30` | 间隔模式：每 N 分钟检查一次 |
-| `GIT_AUTO_PULL_TIME` | `06:00` | 定时模式：每天检查时间 |
-| `GIT_AUTO_PULL_SCHEDULE_TYPE` | `both` | 调度类型：`cron` / `interval` / `both` |
-| `GIT_AUTO_PULL_NOTIFY_GROUP` | — | 拉取结果通知的目标群号（可选） |
-| `GIT_AUTO_PULL_REMOTE` | `origin` | 远程仓库名或 URL（如 `origin` 或 `https://github.com/user/repo.git`） |
-| `GIT_AUTO_PULL_GIT_PATH` | `git` | git 可执行文件路径（绝对路径或仅文件名） |
-| `GIT_AUTO_PULL_RESTART_CMD` | — | 自定义重启命令（如 `systemctl restart foxmeido`；不设则用 `os.execv` 原地替换） |
-| `GIT_AUTO_PULL_BRANCH` | — | 目标分支（留空自动检测当前分支） |
-
 ### 消息表情回复（可选）
 
 收到消息后立即添加 QQ 表情回应（如 ✅），类似 frontier 的 `send_group_message_reaction` 模式。仅 NapCat/OneBot V11 支持，不支持时自动忽略。
@@ -174,6 +158,31 @@ PLAYWRIGHT_COOKIE_FILE=cookies/steam_playwright.json
 | `105` | 👍 爱你 | — |
 | `101` | 🙏 抱拳 | — |
 | `74` | 💩 便便 | — |
+
+### 崩溃推送 ntfy（可选）
+
+`log_crash()` 调用时会额外推送 ntfy 通知。可自建 ntfy 服务器。
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `CRASH_NTFY_SERVER` | `https://ntfy.sh` | ntfy 服务器地址 |
+| `CRASH_NTFY_TOPIC` | — | ntfy topic，不设则不推送 |
+
+### 自动拉取仓库更新（可选）
+
+定时或手动执行 `git pull`，检测到新提交后自动重启机器人以加载新代码。
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `GIT_AUTO_PULL_ENABLED` | `false` | 是否启用自动检查 |
+| `GIT_AUTO_PULL_INTERVAL` | `30` | 间隔模式：每 N 分钟检查一次 |
+| `GIT_AUTO_PULL_TIME` | `06:00` | 定时模式：每天检查时间 |
+| `GIT_AUTO_PULL_SCHEDULE_TYPE` | `both` | 调度类型：`cron` / `interval` / `both` |
+| `GIT_AUTO_PULL_NOTIFY_GROUP` | — | 拉取结果通知的目标群号（可选） |
+| `GIT_AUTO_PULL_REMOTE` | `origin` | 远程仓库名或 URL（如 `origin` 或 `https://github.com/user/repo.git`） |
+| `GIT_AUTO_PULL_GIT_PATH` | `git` | git 可执行文件路径（绝对路径或仅文件名） |
+| `GIT_AUTO_PULL_RESTART_CMD` | — | 自定义重启命令（如 `systemctl restart foxmeido`；不设则用 `os.execv` 原地替换） |
+| `GIT_AUTO_PULL_BRANCH` | — | 目标分支（留空自动检测当前分支）
 
 ## 命令
 
