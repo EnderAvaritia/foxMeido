@@ -15,6 +15,7 @@ auto_pull.py - 自动拉取仓库更新插件
   GIT_AUTO_PULL_NOTIFY_GROUP=          # 拉取结果通知的目标群号（可选）
   GIT_AUTO_PULL_REMOTE=origin          # 远程仓库名或 URL（如 origin 或 https://github.com/user/repo.git）
   GIT_AUTO_PULL_GIT_PATH=git           # git 可执行文件路径（默认 git，用绝对路径如 C:/Program Files/Git/bin/git.exe）
+  GIT_AUTO_PULL_RESTART_CMD=           # 自定义重启命令（如 systemctl restart bot；不设则用 os.execv）
   GIT_AUTO_PULL_BRANCH=                # 目标分支（留空则自动检测当前分支）
 """
 
@@ -84,6 +85,7 @@ def get_config() -> dict[str, Any]:
     notify_group = _read_dotenv("GIT_AUTO_PULL_NOTIFY_GROUP")
     remote = _read_dotenv("GIT_AUTO_PULL_REMOTE") or "origin"
     git_path = _read_dotenv("GIT_AUTO_PULL_GIT_PATH") or "git"
+    restart_cmd = _read_dotenv("GIT_AUTO_PULL_RESTART_CMD") or ""
     branch = _read_dotenv("GIT_AUTO_PULL_BRANCH") or ""
 
     try:
@@ -102,6 +104,7 @@ def get_config() -> dict[str, Any]:
         "notify_group": notify_group,
         "remote": remote,
         "git_path": git_path,
+        "restart_cmd": restart_cmd,
         "branch": branch,
     }
 
@@ -222,19 +225,46 @@ def git_pull(remote: str, branch: str, force: bool = False) -> tuple[bool, str]:
 
 
 # ── 机器人重启 ────────────────────────────────────────────────────
-def _restart_process() -> None:
-    """替换当前进程以重启机器人。"""
-    logger.info("正在重启机器人...")
-    # 使用与启动时相同的 Python 解释器和参数
+def _restart_via_execv() -> None:
+    """方式 A：os.execv 替换当前进程（Linux 上工作良好，Windows 不推荐）。"""
+    logger.info("通过 os.execv 重启...")
     args = [sys.executable, "-m", "nb_cli", "run"]
     os.execv(sys.executable, args)
+
+
+def _restart_via_command(cmd: str) -> None:
+    """方式 B：执行自定义命令后退出当前进程。"""
+    import shlex
+
+    logger.info("通过自定义命令重启: %s", cmd)
+    try:
+        parts = shlex.split(cmd)
+        subprocess.Popen(parts, shell=False)
+    except Exception as e:
+        logger.error("自定义重启命令失败: %s", e)
+    # 无论如何都退出，让进程管理器或新进程接管
+    os._exit(0)
+
+
+def restart_bot() -> None:
+    """根据配置选择重启方式。"""
+    cfg = get_config()
+    cmd = cfg.get("restart_cmd", "").strip()
+    if cmd:
+        _restart_via_command(cmd)
+    else:
+        try:
+            _restart_via_execv()
+        except Exception as e:
+            logger.error("os.execv 重启失败，退出进程: %s", e)
+            os._exit(1)
 
 
 async def restart_with_delay(delay: int = 3) -> None:
     """延迟后重启机器人，确保响应消息发送完毕。"""
     logger.info("将在 %d 秒后重启...", delay)
     await asyncio.sleep(delay)
-    _restart_process()
+    restart_bot()
 
 
 # ── 消息发送 ──────────────────────────────────────────────────────

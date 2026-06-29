@@ -143,6 +143,7 @@ PLAYWRIGHT_COOKIE_FILE=cookies/steam_playwright.json
 | `GIT_AUTO_PULL_NOTIFY_GROUP` | — | 拉取结果通知的目标群号（可选） |
 | `GIT_AUTO_PULL_REMOTE` | `origin` | 远程仓库名或 URL（如 `origin` 或 `https://github.com/user/repo.git`） |
 | `GIT_AUTO_PULL_GIT_PATH` | `git` | git 可执行文件路径（绝对路径或仅文件名） |
+| `GIT_AUTO_PULL_RESTART_CMD` | — | 自定义重启命令（如 `systemctl restart foxmeido`；不设则用 `os.execv` 原地替换） |
 | `GIT_AUTO_PULL_BRANCH` | — | 目标分支（留空自动检测当前分支） |
 
 ### 消息表情回复（可选）
