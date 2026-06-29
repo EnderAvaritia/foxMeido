@@ -141,7 +141,7 @@ PLAYWRIGHT_COOKIE_FILE=cookies/steam_playwright.json
 | `GIT_AUTO_PULL_TIME` | `06:00` | 定时模式：每天检查时间 |
 | `GIT_AUTO_PULL_SCHEDULE_TYPE` | `both` | 调度类型：`cron` / `interval` / `both` |
 | `GIT_AUTO_PULL_NOTIFY_GROUP` | — | 拉取结果通知的目标群号（可选） |
-| `GIT_AUTO_PULL_REMOTE` | `origin` | 远程仓库名 |
+| `GIT_AUTO_PULL_REMOTE` | `origin` | 远程仓库名或 URL（如 `origin` 或 `https://github.com/user/repo.git`） |
 | `GIT_AUTO_PULL_GIT_PATH` | `git` | git 可执行文件路径（绝对路径或仅文件名） |
 | `GIT_AUTO_PULL_BRANCH` | — | 目标分支（留空自动检测当前分支） |
 

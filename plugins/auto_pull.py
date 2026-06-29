@@ -13,7 +13,7 @@ auto_pull.py - 自动拉取仓库更新插件
   GIT_AUTO_PULL_TIME=06:00             # 定时模式：每天检查时间（HH:MM）
   GIT_AUTO_PULL_SCHEDULE_TYPE=both     # cron / interval / both（默认 both）
   GIT_AUTO_PULL_NOTIFY_GROUP=          # 拉取结果通知的目标群号（可选）
-  GIT_AUTO_PULL_REMOTE=origin          # 远程仓库名（默认 origin）
+  GIT_AUTO_PULL_REMOTE=origin          # 远程仓库名或 URL（如 origin 或 https://github.com/user/repo.git）
   GIT_AUTO_PULL_GIT_PATH=git           # git 可执行文件路径（默认 git，用绝对路径如 C:/Program Files/Git/bin/git.exe）
   GIT_AUTO_PULL_BRANCH=                # 目标分支（留空则自动检测当前分支）
 """
@@ -126,20 +126,26 @@ def _git(*args: str, timeout: int = 60) -> tuple[str, str, int]:
         return "", f"执行 git 失败: {e}", -1
 
 
+def _is_url(value: str) -> bool:
+    """判断字符串是 URL 还是 remote 名称。"""
+    return "://" in value or value.startswith("git@")
+
+
+def _fetch_ref(remote: str, branch: str) -> str:
+    """返回 fetch 后可用的 ref（URL 模式用 FETCH_HEAD，remote 模式用 remote/branch）。"""
+    if _is_url(remote):
+        return "FETCH_HEAD"
+    return f"{remote}/{branch}"
+
+
 def get_current_branch() -> str:
     """获取当前分支名。"""
     stdout, _, rc = _git("rev-parse", "--abbrev-ref", "HEAD")
     return stdout if rc == 0 else ""
 
 
-def get_remote_url(remote: str) -> str:
-    """获取远程仓库 URL。"""
-    stdout, _, rc = _git("remote", "get-url", remote)
-    return stdout if rc == 0 else ""
-
-
 def git_fetch(remote: str, branch: str) -> bool:
-    """git fetch 远程，返回是否成功。"""
+    """git fetch 远程（支持 remote 名称或 URL），返回是否成功。"""
     stdout, stderr, rc = _git("fetch", remote, branch)
     if rc != 0:
         logger.warning("git fetch 失败: %s", stderr)
@@ -148,8 +154,9 @@ def git_fetch(remote: str, branch: str) -> bool:
 
 
 def count_behind(remote: str, branch: str) -> int:
-    """获取落后远程的 commit 数。"""
-    stdout, stderr, rc = _git("rev-list", "--count", f"HEAD..{remote}/{branch}")
+    """获取落后远程的 commit 数（支持 remote 名称或 URL）。"""
+    ref = _fetch_ref(remote, branch)
+    stdout, stderr, rc = _git("rev-list", "--count", f"HEAD..{ref}")
     if rc == 0 and stdout.isdigit():
         return int(stdout)
     return 0
@@ -168,7 +175,7 @@ def git_pull(remote: str, branch: str, force: bool = False) -> tuple[bool, str]:
     执行 git pull。
 
     Args:
-        remote: 远程仓库名。
+        remote: 远程仓库名或 URL。
         branch: 目标分支。
         force: 是否强制拉取（丢弃本地更改）。
 
@@ -191,9 +198,11 @@ def git_pull(remote: str, branch: str, force: bool = False) -> tuple[bool, str]:
     if behind == 0:
         return False, "已经是最新"
 
+    ref = _fetch_ref(remote, branch)
+
     # force 模式下先 reset
     if force:
-        _git("reset", "--hard", f"{remote}/{branch}")
+        _git("reset", "--hard", ref)
     else:
         stdout, stderr, rc = _git("pull", remote, branch)
         if rc != 0:
