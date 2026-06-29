@@ -130,6 +130,19 @@ PLAYWRIGHT_COOKIE_FILE=cookies/steam_playwright.json
 | `pending` | 手动触发一次检查，结果发送到当前群 |
 | `pending test` | 发送测试推送（QQ 消息 + ntfy 如有配置） |
 
+### 自动拉取仓库更新（可选）
+
+定时或手动执行 `git pull`，检测到新提交后自动重启机器人以加载新代码。
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `GIT_AUTO_PULL_ENABLED` | `false` | 是否启用自动检查 |
+| `GIT_AUTO_PULL_INTERVAL` | `30` | 间隔模式：每 N 分钟检查一次 |
+| `GIT_AUTO_PULL_TIME` | `06:00` | 定时模式：每天检查时间 |
+| `GIT_AUTO_PULL_SCHEDULE_TYPE` | `both` | 调度类型：`cron` / `interval` / `both` |
+| `GIT_AUTO_PULL_NOTIFY_GROUP` | — | 拉取结果通知的目标群号（可选） |
+| `GIT_AUTO_PULL_BRANCH` | — | 目标分支（留空自动检测当前分支） |
+
 ### 消息表情回复（可选）
 
 收到消息后立即添加 QQ 表情回应（如 ✅），类似 frontier 的 `send_group_message_reaction` 模式。仅 NapCat/OneBot V11 支持，不支持时自动忽略。
@@ -169,6 +182,8 @@ PLAYWRIGHT_COOKIE_FILE=cookies/steam_playwright.json
 | `cs [最低价] [日销量]` | — | CS2 挂刀行情表 |
 | `dota [最低价] [日销量]` | — | Dota2 挂刀行情表 |
 | `pending` | — | 鉴赏家副本监控，手动触发检查 |
+| `update` / `pull` | — | 手动触发 git pull，检测到更新后自动重启机器人 |
+| `update force` | — | 强制拉取（丢弃本地未提交更改）后重启 |
 | `help` | — | 显示帮助 |
 
 Steam 商店链接会自动触发查询（如发送 `https://store.steampowered.com/app/3251240`）。
@@ -205,6 +220,7 @@ foxMeido/
     ├── steamPublisherFinderAuto.py# 发行商链接自动触发
     ├── steamSearcher.py  # Steam 游戏搜索
     ├── playwright_utils.py # 共享 Playwright 工具
+    ├── auto_pull.py        # 自动拉取仓库更新（定时 + 手动命令）
     ├── message_reaction.py # 表情回复模块（核心函数 + 自动钩子）
     ├── error_logger.py     # 错误日志模块（全模块共用）
     └── noco/
