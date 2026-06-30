@@ -94,7 +94,7 @@ Playwright 用于 Steam 页面截图（`steamGoods`、`pub` 等命令）。
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `PLAYWRIGHT_HEADLESS` | `true` | 无头模式。设为 `false` 可在调试时看到浏览器窗口 |
-| `PLAYWRIGHT_COOKIE_FILE` | — | Playwright 格式的 Cookie 文件路径（JSON），用于登录态截图。参考 `cookies/steam_playwright.json.example` |
+| `PLAYWRIGHT_COOKIE_FILE` | — | Playwright 格式的 Cookie 文件路径（JSON），用于登录态截图。参考 `data/cookies/steam_playwright.json.example` |
 
 **获取 Playwright Cookie：**
 
@@ -102,10 +102,10 @@ Playwright 用于 Steam 页面截图（`steamGoods`、`pub` 等命令）。
 python scripts/get_steam_cookies.py
 ```
 
-弹出浏览器 → 手动登录 Steam → 回车 → cookie 自动写入 `cookies/steam_playwright.json`。然后在 `.env` 中添加：
+弹出浏览器 → 手动登录 Steam → 回车 → cookie 自动写入 `data/cookies/steam_playwright.json`。然后在 `.env` 中添加：
 
 ```env
-PLAYWRIGHT_COOKIE_FILE=cookies/steam_playwright.json
+PLAYWRIGHT_COOKIE_FILE=data/cookies/steam_playwright.json
 ```
 
 > Playwright 的 cookie 格式与 `STEAM_COOKIE`（requests 用）不通用，需要单独的文件。`STEAM_COOKIE` 用于 wish 命令，`PLAYWRIGHT_COOKIE_FILE` 用于截图功能。
@@ -215,9 +215,11 @@ foxMeido/
 ├── pyproject.toml        # NoneBot 项目配置
 ├── scripts/              # 工具脚本
 │   └── get_steam_cookies.py  # 获取 Playwright 格式的 Steam cookie
-├── cookies/              # Playwright cookie 文件（gitignore）
-│   └── steam_playwright.json.example  # cookie 格式模板
-├── logs/                 # 错误日志（自动创建）
+├── data/                 # 运行时数据（gitignore）
+│   ├── cookies/          #   Playwright cookie 文件
+│   │   └── steam_playwright.json.example  #   cookie 格式模板
+│   └── db/               #   SQLite 数据库文件
+├── logs/                 # 错误日志（自动创建，gitignore）
 └── plugins/
     ├── steam_utils.py    # Steam 通用工具
     ├── cs.py             # CS2 挂刀行情
