@@ -5,6 +5,7 @@ token.txt
 tmp/
 plugins/weather.py
 logs/
+log/
 data/cookies/*.json
 data/db/
 *.zip
