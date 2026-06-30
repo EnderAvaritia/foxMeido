@@ -45,7 +45,7 @@ from nonebot_plugin_apscheduler import scheduler  # noqa: E402
 
 # ── 常量 ──────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = BASE_DIR / "db" / "curator_state.db"
+DB_PATH = BASE_DIR / "data" / "db" / "curator_state.db"
 CST = timezone(timedelta(hours=8))
 
 # ── 默认 ──────────────────────────────────────────────────────────

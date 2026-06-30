@@ -92,7 +92,7 @@ async def load_cookie_file(context) -> None:
 
     JSON 格式为数组，每项需包含 name / value / domain / path，
     可选 httpOnly / secure / sameSite / expires。
-    参考 cookies/steam_playwright.json.example。
+    参考 data/cookies/steam_playwright.json.example。
 
     如果未配置 PLAYWRIGHT_COOKIE_FILE 或文件不存在，静默跳过。
     """
