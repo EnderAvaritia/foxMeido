@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
 from plugins.noco.noco_config import get_proxies, get_http_proxy
-from plugins.playwright_utils import get_headless
+from plugins.playwright_utils import get_headless, _save_failure_screenshot
 from plugins.error_logger import log_error
 from plugins.message_reaction import reaction_cleanup
 
@@ -91,4 +91,14 @@ async def take_screenshot(url: str):
             return screenshot_bytes
         except Exception as e:
             log_error("finder.take_screenshot", f"截图异常: {e}")
+            # 截图失败时尝试保存当前页面快照用于调试
+            page = locals().get('page')
+            if page:
+                await _save_failure_screenshot(page, "finder")
+            try:
+                browser = locals().get('browser')
+                if browser:
+                    await browser.close()
+            except Exception:
+                pass
             return None

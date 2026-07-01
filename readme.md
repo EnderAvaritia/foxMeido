@@ -110,6 +110,10 @@ PLAYWRIGHT_COOKIE_FILE=data/cookies/steam_playwright.json
 
 > Playwright 的 cookie 格式与 `STEAM_COOKIE`（requests 用）不通用，需要单独的文件。`STEAM_COOKIE` 用于 wish 命令，`PLAYWRIGHT_COOKIE_FILE` 用于截图功能。
 
+**截图失败调试：**
+
+截图遇到超时或页面加载失败时，系统会自动将当前页面可见内容保存为 PNG 快照，存放到 `logs/failed_screenshot_*.png`。文件名包含失败来源和时间戳，可用于排查页面结构变化或网络问题。
+
 ### 鉴赏家副本监控（可选）
 
 监控 Steam 鉴赏家后台的待处理游戏副本邀请，有新副本到达时通过 QQ 群消息（和/或 ntfy）推送通知。
@@ -227,6 +231,7 @@ Steam 商店链接会自动触发查询（如发送 `https://store.steampowered.
 
 - 文件格式：`error_<时间戳>.log` 或 `crash_<时间戳>.log`
 - 内容：`[时间] [来源] 描述` + 异常堆栈
+- 截图失败快照：`failed_screenshot_<来源>_<时间戳>.png`（Playwright 截图失败时自动保存的页面快照，用于排查页面加载问题）
 
 ## 项目结构
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime
 
 from playwright.async_api import async_playwright
 from playwright.async_api import Error as PlaywrightError
@@ -84,6 +85,42 @@ def get_headless() -> bool:
 def _project_root() -> str:
     """获取项目根目录（此文件位于 plugins/ 下，往上级 1 层）。"""
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _get_log_dir() -> str:
+    """获取日志目录（与 error_logger 一致）。"""
+    logs_dir = os.path.join(_project_root(), "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    return logs_dir
+
+
+async def _save_failure_screenshot(page, label: str) -> str | None:
+    """
+    截图失败时，尝试保存当前页面可见内容用于调试。
+
+    保存到 ``logs/failed_screenshot_<label>_<时间戳>.png``。
+    page 必须仍是可用状态（未关闭）。
+
+    Args:
+        page: Playwright page 实例（仍在打开状态）。
+        label: 标识来源，如 ``"take_app_screenshot"`` / ``"steamFinder"``。
+
+    Returns:
+        str | None: 保存的文件路径，失败则 None。
+    """
+    try:
+        fallback_bytes = await page.screenshot(timeout=15000)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        fname = f"failed_screenshot_{label}_{ts}.png"
+        fpath = os.path.join(_get_log_dir(), fname)
+        with open(fpath, "wb") as f:
+            f.write(fallback_bytes)
+        print(f"[playwright] 截图失败，已保存当前页面快照 → {fpath}")
+        log_error("_save_failure_screenshot", f"失败快照已保存: {fpath}", exc_info=False)
+        return fpath
+    except Exception as e2:
+        log_error("_save_failure_screenshot", f"保存失败截图也出错了: {e2}")
+        return None
 
 
 async def load_cookie_file(context) -> None:
@@ -238,15 +275,21 @@ async def _navigate_with_age_gate(
 
 
 async def _screenshot_element(page, xpath: str) -> bytes | None:
-    """截取页面中指定 XPath 元素的截图。"""
+    """
+    截取页面中指定 XPath 元素的截图。
+
+    若元素截图失败，自动尝试保存当前页面的完整快照到 logs/ 以便调试。
+    """
     try:
         return await page.locator(f'xpath={xpath}').screenshot()
     except PlaywrightTimeout:
-        log_error("_screenshot_element", f"截图超时: {xpath}")
+        log_error("_screenshot_element", f"元素截图超时: {xpath}")
+        await _save_failure_screenshot(page, "screenshot_element_timeout")
         return None
     except PlaywrightError as e:
         msg = e.message if hasattr(e, 'message') else str(e)
-        log_error("_screenshot_element", f"截图失败: {msg}")
+        log_error("_screenshot_element", f"元素截图失败: {msg}")
+        await _save_failure_screenshot(page, "screenshot_element_error")
         return None
 
 
@@ -266,6 +309,7 @@ async def take_app_screenshot(appid: str) -> bytes | None:
         return None
     try:
         if not await _navigate_with_age_gate(page, url):
+            await _save_failure_screenshot(page, f"take_app_screenshot_{appid}")
             return None
         print("[screenshot] 开始截图 glance_ctn")
         return await _screenshot_element(page, '//div[@class="glance_ctn"]')
@@ -288,6 +332,7 @@ async def take_publisher_screenshot(url: str) -> bytes | None:
         return None
     try:
         if not await _navigate_with_age_gate(page, url):
+            await _save_failure_screenshot(page, "take_publisher_screenshot")
             return None
         return await _screenshot_element(page, '//div[@id="RecommendationsRows"]')
     finally:
