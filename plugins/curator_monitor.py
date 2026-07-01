@@ -308,10 +308,24 @@ def run_check() -> CheckResult:
     if result.new_games or result.updated_games:
         maybe_ntfy(result, cfg["curator_name"])
 
-    logger.info(
-        "鉴赏家检查完成: 待处理 {}, 游戏 {} 款, 新增 {}, 累计 {}",
-        result.total_pending, len(result.games), len(result.new_games), total_in_db,
-    )
+    if not result.games:
+        logger.info(
+            "鉴赏家检查完成: 待处理 {}, 游戏 {} 款, 新增 {}, 累计 {}\n探测结果为空",
+            result.total_pending, len(result.games), len(result.new_games),
+            total_in_db,
+        )
+    elif result.new_games:
+        logger.info(
+            "鉴赏家检查完成: 待处理 {}, 游戏 {} 款, 新增 {}, 累计 {}\n最新: {}",
+            result.total_pending, len(result.games), len(result.new_games),
+            total_in_db, result.new_games[0].name,
+        )
+    else:
+        logger.info(
+            "鉴赏家检查完成: 待处理 {}, 游戏 {} 款, 新增 {}, 累计 {}\n无新增",
+            result.total_pending, len(result.games), len(result.new_games),
+            total_in_db,
+        )
     return result
 
 
