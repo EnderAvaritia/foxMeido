@@ -34,8 +34,8 @@ from typing import Any
 
 import requests
 
-# 项目根目录定位：此文件位于 plugins/，往上级 1 层
-_PROJECT_ROOT: str = os.path.dirname(os.path.abspath(__file__))
+# 项目根目录定位：此文件位于 plugins/error_logger.py，往上级 2 层
+_PROJECT_ROOT: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _LOG_DIR: str = os.path.join(_PROJECT_ROOT, "logs")
 os.makedirs(_LOG_DIR, exist_ok=True)
 

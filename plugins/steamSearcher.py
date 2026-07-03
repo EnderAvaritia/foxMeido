@@ -75,7 +75,7 @@ async def do_search(keyword: str, cleanup):
         try:
             response = await client.get(url, headers=headers, timeout=30)
         except Exception as e:
-            log_error("steamSearcher.do_search", f"请求Steam搜索页失败: {e}")
+            log_error("steamSearcher.do_search", f"请求Steam搜索页失败: {type(e).__name__}: {e}")
             if cleanup: await cleanup()
             await steam_searcher.finish("请求失败，请检查网络或代理配置", at_sender=False)
         if response.status_code != 200:
