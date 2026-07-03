@@ -89,7 +89,7 @@ def _project_root() -> str:
 
 def _get_log_dir() -> str:
     """获取日志目录（与 error_logger 一致）。"""
-    logs_dir = os.path.join(_project_root(), "logs")
+    logs_dir = os.path.join(_project_root(), "log")
     os.makedirs(logs_dir, exist_ok=True)
     return logs_dir
 
