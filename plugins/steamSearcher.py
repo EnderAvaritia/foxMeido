@@ -10,6 +10,7 @@ from plugins.noco.noco_config import get_http_proxy
 from plugins.playwright_utils import take_app_screenshot
 from plugins.error_logger import log_error
 from plugins.message_reaction import reaction_cleanup
+from plugins.steam_utils import get_game_info
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_alconna import Alconna, Args, Match, UniMessage, on_alconna  # noqa: E402
@@ -135,11 +136,37 @@ async def get_choice(number: int):
         if cleanup: await cleanup()
         await steam_searcher.finish("无效的链接", at_sender=False)
         return
+
+    # 获取游戏详细信息（与 steamFinderAuto 格式一致）
+    gameInfo = get_game_info(appid)
+    if "error" in gameInfo:
+        if cleanup: await cleanup()
+        await steam_searcher.finish(f"游戏{appid}数据获取出错，请反馈", at_sender=False)
+
+    # 格式化价格
+    if gameInfo["currency"]:
+        price_format = (
+            f'\n原价：{str(gameInfo["initial"]) + gameInfo["currency"]}'
+            f'\n现价：{str(gameInfo["final"]) + gameInfo["currency"]}'
+            f'\n折扣：-{100 - (gameInfo["final"] / gameInfo["initial"] * 100):.0f}%'
+        )
+    else:
+        price_format = ""
+
+    info_text = (
+        f'游戏名：{gameInfo["game_name"]}'
+        f'\n支持语言：{gameInfo["supported_languages"]}'
+        f'\n发售日期：{gameInfo["release_date"]}'
+        f'\n发行商：{gameInfo["publisher"]}'
+        f'{price_format}'
+        f'\nSteam商店页链接：https://store.steampowered.com/app/{appid}'
+    )
+
     screenshot_bytes = await take_app_screenshot(appid)
     if screenshot_bytes:
         pic = UniMessage.image(raw=screenshot_bytes)
         if cleanup: await cleanup()
-        await steam_searcher.finish(message=pic, at_sender=False)
+        await steam_searcher.finish(message=info_text + "\n" + pic, at_sender=False)
     else:
         if cleanup: await cleanup()
-        await steam_searcher.finish("未能获取详情页面", at_sender=False)
+        await steam_searcher.finish(message=info_text, at_sender=False)
