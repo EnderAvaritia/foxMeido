@@ -22,18 +22,22 @@ from plugins.error_logger import log_error
 
 def get_game_info(appid: int | str) -> dict[str, Any]:
     """
-    通过 Steam Web API 获取游戏名称、厂商名和发行日期。
+    通过 Steam Web API 获取游戏名称、厂商名、发行日期、支持语言和价格信息。
 
     Args:
         appid: Steam AppID。
 
     Returns:
-        dict: 包含 game_name、publisher、release_date 的字典，
-              出错时含 error 键。
+        dict: 包含 game_name、publisher、release_date、supported_languages、
+              initial、final、currency 的字典，出错时含 error 键。
     """
     game_name: str | None = None
     publisher: str | None = None
     release_date: str | None = None
+    supported_languages: str | None = None
+    initial: float = 1
+    final: float = 1
+    currency: str | None = None
     errors: list[str] = []
 
     api_url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=schinese"
@@ -77,6 +81,35 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
                     errors.append(
                         f"API返回的发行日期为空 (AppID: {appid})"
                     )
+
+                # 支持语言
+                raw_lang = details.get("supported_languages")
+                if raw_lang:
+                    supported_languages = re.sub(
+                        "<.*?>", "", raw_lang
+                    ).replace("*", "").replace("具有完全音频支持的语言", "")
+                else:
+                    errors.append(
+                        f"API返回的支持语言为空 (AppID: {appid})"
+                    )
+
+                # 价格信息
+                try:
+                    price = details.get("price_overview")
+                    if price:
+                        initial = int(price.get("initial", 0)) / 100
+                        final = int(price.get("final", 0)) / 100
+                        currency = price.get("currency")
+                    else:
+                        initial = 1
+                        final = 1
+                        currency = None
+                except Exception as e:
+                    errors.append(f"解析价格异常 (AppID: {appid}): {e}")
+                    log_error("steam_utils.get_game_info", f"价格异常: {e}")
+                    initial = 1
+                    final = 1
+                    currency = None
             else:
                 errors.append(
                     f"API返回数据中未找到'data'详情 (AppID: {appid})"
@@ -88,18 +121,22 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
             )
     except requests.exceptions.RequestException as e:
         errors.append(f"请求API接口时发生网络错误或HTTP错误: {e}")
-        log_error("noco_utils.get_game_info", f"请求API异常: {e}")
+        log_error("steam_utils.get_game_info", f"请求API异常: {e}")
     except json.JSONDecodeError as e:
         errors.append(f"解析API响应JSON时发生错误: {e}")
-        log_error("noco_utils.get_game_info", f"JSON解析异常: {e}")
+        log_error("steam_utils.get_game_info", f"JSON解析异常: {e}")
     except Exception as e:
         errors.append(f"处理API响应时发生未知错误: {e}")
-        log_error("noco_utils.get_game_info", f"未知异常: {e}")
+        log_error("steam_utils.get_game_info", f"未知异常: {e}")
 
     result: dict[str, Any] = {
         "game_name": game_name,
         "publisher": publisher,
         "release_date": release_date,
+        "supported_languages": supported_languages,
+        "initial": initial,
+        "final": final,
+        "currency": currency,
     }
     if errors:
         result["error"] = "; ".join(errors)

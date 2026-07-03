@@ -215,7 +215,7 @@ PLAYWRIGHT_COOKIE_FILE=data/cookies/steam_playwright.json
 |------|------|------|
 | `id <appid/url>` | `steam` `查商店` `steamGoods` | 查询游戏详情（名称、厂商、发行日期、价格、截图） |
 | `pub <publisher>` | `steamPublishers` | 查询发行商页面截图 |
-| `find <关键字>` | `搜索steam游戏` | 交互式搜索 Steam 游戏 |
+| `find <关键字>` | `搜索steam游戏` | 交互式搜索 Steam 游戏，搜索结果选编号后显示详情（名称、语言、日期、发行商、价格、截图） |
 | `cs [最低价] [日销量]` | — | CS2 挂刀行情表 |
 | `dota [最低价] [日销量]` | — | Dota2 挂刀行情表 |
 | `pending` | — | 鉴赏家副本监控，手动触发检查 |
