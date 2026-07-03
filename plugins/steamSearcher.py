@@ -26,22 +26,37 @@ steam_searcher = on_alconna(
 
 @steam_searcher.handle()
 async def handle_function(bot, event, name: Match[str]):
-    cleanup = await reaction_cleanup(bot, event)
+    # 检查是否从 pause() 恢复
+    step = steam_searcher.get_path_arg("_step", "")
 
-    # Step 1: 获取搜索关键词（从命令参数或等待输入）
-    keyword = name.result.strip() if name.available else ""
-    if not keyword:
-        await steam_searcher.send("请输入要搜索的游戏名称", at_sender=False)
-        resp = await steam_searcher.receive()
-        keyword = resp.get_plaintext().strip()
+    if step == "awaiting_choice":
+        # 用户刚回复了编号
+        await handle_choice(event)
+        return
+
+    if step == "awaiting_keyword":
+        # 用户刚回复了搜索关键词
+        cleanup = steam_searcher.get_path_arg("cleanup")
+        keyword = event.get_plaintext().strip()
         if not keyword:
             if cleanup: await cleanup()
             await steam_searcher.finish("oh!NO!")
+        steam_searcher.set_path_arg("_step", "")  # 清除状态，让 do_search 重新设置
+        await do_search(keyword, cleanup)
+        return
 
-    # Step 2: 搜索 Steam 并展示结果
+    # 首次触发：从命令参数获取关键词
+    cleanup = await reaction_cleanup(bot, event)
+    keyword = name.result.strip() if name.available else ""
+
+    if not keyword:
+        steam_searcher.set_path_arg("cleanup", cleanup)
+        steam_searcher.set_path_arg("_step", "awaiting_keyword")
+        await steam_searcher.send("请输入要搜索的游戏名称", at_sender=False)
+        await steam_searcher.pause(at_sender=False)
+        return  # 不会到达这里
+
     await do_search(keyword, cleanup)
-
-    if cleanup: await cleanup()
 
 
 async def do_search(keyword: str, cleanup):
@@ -103,10 +118,18 @@ async def do_search(keyword: str, cleanup):
     search_result = "搜索结果：\n" + "\n".join(game_titles)
     await steam_searcher.send(search_result, at_sender=False)
 
-    # Step 3: 等待用户选择编号
+    # 存储数据并等待用户选择编号
+    steam_searcher.set_path_arg("game_links", game_links)
+    steam_searcher.set_path_arg("cleanup", cleanup)
+    steam_searcher.set_path_arg("_step", "awaiting_choice")
     await steam_searcher.send("请选择要查看的游戏编号,输入0退出", at_sender=False)
-    resp = await steam_searcher.receive()
-    raw = resp.get_plaintext().strip()
+    await steam_searcher.pause(at_sender=False)
+
+
+async def handle_choice(event):
+    cleanup = steam_searcher.get_path_arg("cleanup", None)
+    game_links = steam_searcher.get_path_arg("game_links", [])
+    raw = event.get_plaintext().strip()
 
     try:
         number = int(raw)
@@ -132,7 +155,7 @@ async def do_search(keyword: str, cleanup):
         await steam_searcher.finish("无效的链接", at_sender=False)
         return
 
-    # Step 4: 获取游戏详细信息并发送（与 steamFinderAuto 格式一致）
+    # 获取游戏详细信息并发送（与 steamFinderAuto 格式一致）
     gameInfo = get_game_info(appid)
     if "error" in gameInfo:
         if cleanup: await cleanup()
