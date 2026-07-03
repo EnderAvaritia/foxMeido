@@ -3,7 +3,6 @@ from lxml import html
 
 from nonebot import require
 
-# from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 from nonebot.rule import to_me
 
 from plugins.noco.noco_config import get_http_proxy
@@ -28,27 +27,24 @@ steam_searcher = on_alconna(
 @steam_searcher.handle()
 async def handle_function(bot, event, name: Match[str]):
     cleanup = await reaction_cleanup(bot, event)
-    steam_searcher.set_path_arg("_reaction_cleanup", cleanup)
-    if name.available:
-        # 如果参数已经提供，直接处理
-        steam_searcher.set_path_arg("name", name.result)
-        # await get_message(name.result)
-    else:
-        # 如果没有提供参数，进入got_path流程
-        steam_searcher.set_path_arg("name", None)
+
+    # Step 1: 获取搜索关键词（从命令参数或等待输入）
+    keyword = name.result.strip() if name.available else ""
+    if not keyword:
+        await steam_searcher.send("请输入要搜索的游戏名称", at_sender=False)
+        resp = await steam_searcher.receive()
+        keyword = resp.get_plaintext().strip()
+        if not keyword:
+            if cleanup: await cleanup()
+            await steam_searcher.finish("oh!NO!")
+
+    # Step 2: 搜索 Steam 并展示结果
+    await do_search(keyword, cleanup)
+
+    if cleanup: await cleanup()
 
 
-@steam_searcher.got_path("name", prompt="请输入要搜索的游戏名称")
-async def send_message(name: str):
-    cleanup = steam_searcher.get_path_arg("_reaction_cleanup", None)
-    print(name)
-    if name and name.strip():  # 更严格的空值检查
-        await get_message(name, cleanup)
-    else:
-        print("no_match")
-        await steam_searcher.send("oh!NO!")
-
-async def get_message(name, cleanup=None):
+async def do_search(keyword: str, cleanup):
     headers = {
         'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:138.0) Gecko/20100101 Firefox/138.0",
         'Accept': "text/javascript, text/html, application/xml, text/xml, */*",
@@ -63,16 +59,14 @@ async def get_message(name, cleanup=None):
         'Sec-Fetch-Site': "same-origin",
         'Cookie': ""
     }
-    #添加cookies
-    
+
     proxy_url = get_http_proxy()
 
     url = (
         "https://store.steampowered.com/search/?term="
-        + name
+        + keyword
         + "&supportedlang=schinese%2Cenglish%2Ctchinese%2Cjapanese"
     )
-    print(url)
 
     client_kwargs = {}
     if proxy_url:
@@ -80,24 +74,16 @@ async def get_message(name, cleanup=None):
     async with httpx.AsyncClient(**client_kwargs) as client:
         response = await client.get(url, headers=headers)
         if response.status_code != 200:
-            print("请求失败")
             if cleanup: await cleanup()
             await steam_searcher.finish("请求失败", at_sender=False)
 
-        print("请求成功")
-        content = response.text
-
-    tree = html.fromstring(content)
-
-    # with open("temphtml.html", 'wb') as file:
-        # file.write(html.tostring(tree, pretty_print=True, encoding='utf-8'))#打印网页，测试用
+    tree = html.fromstring(response.text)
 
     # 获取前5个游戏条目
     items = tree.xpath('//a[@data-gpnav="item"]')
     if not items or len(items) == 0:
         if cleanup: await cleanup()
         await steam_searcher.finish("什么都找不到呢", at_sender=False)
-        return
 
     game_titles = []
     game_links = []
@@ -108,24 +94,28 @@ async def get_message(name, cleanup=None):
         href = item.get("href")
         game_links.append(href)
 
-    # 发送游戏列表
+    # 发送搜索结果
     search_result = "搜索结果：\n" + "\n".join(game_titles)
-    print(search_result)
     await steam_searcher.send(search_result, at_sender=False)
-    # 存储链接到会话
-    steam_searcher.set_path_arg("game_links", game_links)
 
+    # Step 3: 等待用户选择编号
+    await steam_searcher.send("请选择要查看的游戏编号,输入0退出", at_sender=False)
+    resp = await steam_searcher.receive()
+    raw = resp.get_plaintext().strip()
 
-@steam_searcher.got_path("number", prompt="请选择要查看的游戏编号,输入0退出")
-async def get_choice(number: int):
-    cleanup = steam_searcher.get_path_arg("_reaction_cleanup", None)
-    game_links = steam_searcher.get_path_arg("game_links", [])
+    try:
+        number = int(raw)
+    except ValueError:
+        if cleanup: await cleanup()
+        await steam_searcher.finish("请输入有效的数字", at_sender=False)
+
     if number == 0:
         if cleanup: await cleanup()
         await steam_searcher.finish("已退出")
-    elif not game_links or number < 1 or number > len(game_links):
-        await steam_searcher.reject("无效的选择，请重试", at_sender=False)
-        return
+    elif number < 1 or number > len(game_links):
+        if cleanup: await cleanup()
+        await steam_searcher.finish("无效的选择", at_sender=False)
+
     link = game_links[number - 1]
     # 从 URL 如 https://store.steampowered.com/app/12345/ 中提取 appid
     parts = link.split("/")
@@ -137,7 +127,7 @@ async def get_choice(number: int):
         await steam_searcher.finish("无效的链接", at_sender=False)
         return
 
-    # 获取游戏详细信息（与 steamFinderAuto 格式一致）
+    # Step 4: 获取游戏详细信息并发送（与 steamFinderAuto 格式一致）
     gameInfo = get_game_info(appid)
     if "error" in gameInfo:
         if cleanup: await cleanup()
@@ -153,7 +143,6 @@ async def get_choice(number: int):
     else:
         price_format = ""
 
-    # 构建信息文本
     info_text = (
         f'游戏名：{gameInfo["game_name"]}'
         f'\n支持语言：{gameInfo["supported_languages"]}'
