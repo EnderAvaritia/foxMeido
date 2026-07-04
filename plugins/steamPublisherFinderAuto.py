@@ -63,7 +63,12 @@ async def get_message(publisher):
 
 async def fetch_title(url: str) -> str:
     try:
-        response = requests.get(url, proxies=get_proxies())
+        request_kwargs: dict[str, Any] = {}
+        proxy_cfg = get_proxies()
+        if proxy_cfg:
+            request_kwargs["proxies"] = proxy_cfg
+            request_kwargs["verify"] = False
+        response = requests.get(url, **request_kwargs)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.content, "html.parser")
