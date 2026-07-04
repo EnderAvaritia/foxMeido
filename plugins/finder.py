@@ -49,7 +49,12 @@ async def handle_function(bot, event, args: Message = CommandArg()):
 async def fetch_title(url: str) -> str:
     try:
         # 发送HTTP GET请求
-        response = requests.get(url, proxies=get_proxies())
+        request_kwargs = {}
+        proxy_cfg = get_proxies()
+        if proxy_cfg:
+            request_kwargs["proxies"] = proxy_cfg
+            request_kwargs["verify"] = False
+        response = requests.get(url, **request_kwargs)
         response.raise_for_status()
         print(response.status_code)
 
