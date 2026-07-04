@@ -1,4 +1,5 @@
 import httpx
+import urllib3
 from lxml import html
 
 from nonebot import require
@@ -14,6 +15,9 @@ from plugins.steam_utils import get_game_info
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_alconna import Alconna, Args, Match, UniMessage, on_alconna  # noqa: E402
+
+# 通过代理访问 HTTPS 时，不验证 SSL 证书
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 steam_searcher = on_alconna(
@@ -77,6 +81,7 @@ async def get_message(name, cleanup=None):
     client_kwargs = {}
     if proxy_url:
         client_kwargs["proxy"] = proxy_url
+        client_kwargs["verify"] = False
     async with httpx.AsyncClient(**client_kwargs) as client:
         response = await client.get(url, headers=headers)
         if response.status_code != 200:

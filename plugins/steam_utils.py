@@ -14,10 +14,14 @@ import json
 import re
 from typing import Any
 
+import urllib3
+
 import requests
 
 from plugins.noco.noco_config import get_proxies
 from plugins.error_logger import log_error
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def get_game_info(appid: int | str) -> dict[str, Any]:
@@ -43,16 +47,19 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
     api_url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=schinese"
 
     try:
-        response = requests.get(
-            api_url,
-            proxies=get_proxies(),
-            headers={
+        request_kwargs: dict[str, Any] = {
+            "headers": {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/120.0.0.0 Safari/537.36"
             },
-            timeout=15,
-        )
+            "timeout": 15,
+        }
+        proxy_cfg = get_proxies()
+        if proxy_cfg:
+            request_kwargs["proxies"] = proxy_cfg
+            request_kwargs["verify"] = False
+        response = requests.get(api_url, **request_kwargs)
         response.raise_for_status()
         data = response.json()
         app_data = data.get(str(appid))
