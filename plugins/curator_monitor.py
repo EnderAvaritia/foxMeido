@@ -217,7 +217,8 @@ def fetch_pending_html(curator_id: str, curator_name: str,
         "Cookie": cookie_str,
     }
 
-    resp = requests.get(url, headers=headers, proxies=proxies, timeout=30)
+    resp = requests.get(url, headers=headers, proxies=proxies, timeout=30,
+                        verify=not bool(proxies))
     resp.raise_for_status()
     return resp.text
 
@@ -348,6 +349,7 @@ def send_ntfy(title: str, message: str, topic: str) -> bool:
             headers=headers,
             proxies=proxies,
             timeout=15,
+            verify=not bool(proxies),
         )
         resp.raise_for_status()
         logger.info("ntfy 推送成功: %s", title)

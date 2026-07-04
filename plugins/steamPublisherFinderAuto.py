@@ -63,7 +63,7 @@ async def get_message(publisher):
 
 async def fetch_title(url: str) -> str:
     try:
-        request_kwargs: dict[str, Any] = {}
+        request_kwargs = {}
         proxy_cfg = get_proxies()
         if proxy_cfg:
             request_kwargs["proxies"] = proxy_cfg
