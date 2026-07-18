@@ -14,7 +14,7 @@ from nonebot.rule import to_me
 
 from plugins.playwright_utils import take_app_screenshot
 from plugins.message_reaction import reaction_cleanup
-from plugins.steam_utils import get_game_info
+from plugins.steam_utils import get_game_info, get_popular_tags
 
 
 steamGoods = on_command("steamGoods", rule=to_me(), aliases={"steam", "查商店", "id"}, priority=10, block=True)
@@ -78,7 +78,8 @@ async def get_message(goodId):
     appid = goodId[0][0] 
     gameInfo = get_game_info(appid)
     if "error" in gameInfo:
-        await steamGoods.finish(f"游戏{goodId}数据获取出错，请反馈")   
+        await steamGoods.finish(f"游戏{goodId}数据获取出错，请反馈")
+    tags_result = get_popular_tags(appid)
     pic_data = await take_app_screenshot(appid)
     
     #格式化价格
@@ -96,8 +97,9 @@ async def get_message(goodId):
         pic = MessageSegment.image(f"base64://{base64.b64encode(pic_data).decode()}")
     else:
         pic = '截图超时，请联系'
-        
-    return f'游戏名：{gameInfo["game_name"]}\n类型：{gameInfo["genres"]}\n支持语言：{gameInfo["supported_languages"]}\n发售日期：{gameInfo["release_date"]}\n发行商：{gameInfo["publisher"]}{price_format}\nSteam商店页链接：https://store.steampowered.com/app/{appid}\n' + pic        
+    
+    tags_line = f'\n热门标签：{", ".join(tags_result["tags"][:12])}' if tags_result.get("tags") else ''
+    return f'游戏名：{gameInfo["game_name"]}\n类型：{gameInfo["genres"]}{tags_line}\n支持语言：{gameInfo["supported_languages"]}\n发售日期：{gameInfo["release_date"]}\n发行商：{gameInfo["publisher"]}{price_format}\nSteam商店页链接：https://store.steampowered.com/app/{appid}\n' + pic        
 
 # async def fetch_title(url: str) -> str:
     # proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}

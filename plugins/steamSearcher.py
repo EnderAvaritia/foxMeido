@@ -11,7 +11,7 @@ from plugins.noco.noco_config import get_http_proxy
 from plugins.playwright_utils import take_app_screenshot
 from plugins.error_logger import log_error
 from plugins.message_reaction import reaction_cleanup
-from plugins.steam_utils import get_game_info
+from plugins.steam_utils import get_game_info, get_popular_tags
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_alconna import Alconna, Args, Match, UniMessage, on_alconna  # noqa: E402
@@ -147,6 +147,7 @@ async def get_choice(number: int):
     if "error" in gameInfo:
         if cleanup: await cleanup()
         await steam_searcher.finish(f"游戏{appid}数据获取出错，请反馈", at_sender=False)
+    tags_result = get_popular_tags(appid)
 
     # 格式化价格
     if gameInfo["currency"]:
@@ -158,9 +159,11 @@ async def get_choice(number: int):
     else:
         price_format = ""
 
+    tags_line = f'\n热门标签：{", ".join(tags_result["tags"][:12])}' if tags_result.get("tags") else ''
     info_text = (
         f'游戏名：{gameInfo["game_name"]}'
         f'\n类型：{gameInfo["genres"]}'
+        f'{tags_line}'
         f'\n支持语言：{gameInfo["supported_languages"]}'
         f'\n发售日期：{gameInfo["release_date"]}'
         f'\n发行商：{gameInfo["publisher"]}'
