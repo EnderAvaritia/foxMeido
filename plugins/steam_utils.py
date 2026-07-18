@@ -2,7 +2,7 @@
 steam_utils.py - Steam 通用工具函数
 
 包含：
-- get_game_info()     — 通过 Steam Web API 查询游戏信息
+- get_game_info()     — 通过 Steam Web API 查询游戏信息（名称、厂商、日期、语言、类型、价格）
 - get_popular_tags()  — 从商店页面提取热门用户自定义标签
 - extract_steam_id()  — 从文本/URL 提取 Steam AppID
 """
