@@ -84,7 +84,7 @@ COMMAND_START=[""]
 
 | 变量 | 说明 |
 |------|------|
-| `STEAM_COOKIE` | Steam **商店页面** Cookie，`wish` 功能需要。从浏览器访问 store.steampowered.com → F12 → 复制请求头 `Cookie:` 整行。格式：`sessionid=xxx; steamLogin=xxx; ...` |
+| `STEAM_COOKIE` | Steam **商店页面** Cookie，`wish` 功能和热门标签提取需要。从浏览器访问 store.steampowered.com → F12 → 复制请求头 `Cookie:` 整行。格式：`sessionid=xxx; steamLogin=xxx; ...` |
 | `CURATOR_ID` | Steam 鉴赏家 ID（unreported 功能需要） |
 
 ### Playwright（可选）
@@ -213,9 +213,9 @@ PLAYWRIGHT_COOKIE_FILE=data/cookies/steam_playwright.json
 
 | 命令 | 别名 | 说明 |
 |------|------|------|
-| `id <appid/url>` | `steam` `查商店` `steamGoods` | 查询游戏详情（名称、厂商、发行日期、价格、截图） |
+| `id <appid/url>` | `steam` `查商店` `steamGoods` | 查询游戏详情（名称、类型、热门标签、厂商、发行日期、价格、截图） |
 | `pub <publisher>` | `steamPublishers` | 查询发行商页面截图 |
-| `find <关键字>` | `搜索steam游戏` | 交互式搜索 Steam 游戏，搜索结果选编号后显示详情（名称、语言、日期、发行商、价格、截图） |
+| `find <关键字>` | `搜索steam游戏` | 交互式搜索 Steam 游戏，搜索结果选编号后显示详情（名称、类型、热门标签、语言、日期、发行商、价格、截图） |
 | `cs [最低价] [日销量]` | — | CS2 挂刀行情表 |
 | `dota [最低价] [日销量]` | — | Dota2 挂刀行情表 |
 | `pending` | — | 鉴赏家副本监控，手动触发检查 |
