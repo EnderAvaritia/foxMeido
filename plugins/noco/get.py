@@ -42,7 +42,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
     goodId = extract_steam_id(goodId_str)
     if not goodId:
         if cleanup: await cleanup()
-        await get.finish("你确定这是商品的id？")
+        await get.finish(f"你确定\"{goodId_str}\"是商品的id？")
     gameInfo = get_game_info(goodId)
     if "error" in gameInfo:
         if cleanup: await cleanup()

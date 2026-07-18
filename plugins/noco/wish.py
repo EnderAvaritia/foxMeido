@@ -50,7 +50,7 @@ async def handle_function(bot, event):
     goodId = extract_steam_id(str(event.message).strip())
     if not goodId:
         if cleanup: await cleanup()
-        await wish.finish("你确定这是商品的id？")
+        await wish.finish(f"你确定\"{str(event.message).strip()}\"是商品的id？")
 
     gameInfo = get_game_info(goodId)
 

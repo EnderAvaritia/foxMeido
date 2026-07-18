@@ -20,12 +20,15 @@ async def handle_function(bot, event):
         goodIds = event.get_plaintext()
         goodIds = goodIds.split()
         for goodId in goodIds:
+            if not (goodId.startswith("https://store.steampowered.com/app/") or goodId.isdigit()):
+                continue
             await send_message(goodId)
     finally:
         if cleanup: await cleanup()
 
 
 async def send_message(goodId):
+    original_input = goodId
     goodId = re.findall(r"(?<=app/)(\d+)|(\d{5,11})", goodId)
     print(goodId)
     if goodId != [] and goodId != "":
@@ -34,7 +37,7 @@ async def send_message(goodId):
             await steamGoods.send(message=result, at_sender=False)
     else:
         print("no_match")
-        await steamGoods.send("你确定这是商品的id？")
+        await steamGoods.send(f"你确定\"{original_input}\"是商品的id？")
 
 
 async def get_message(goodId):
