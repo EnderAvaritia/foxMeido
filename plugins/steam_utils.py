@@ -19,7 +19,7 @@ import requests
 
 from bs4 import BeautifulSoup
 
-from plugins.noco.noco_config import get_proxies
+from plugins.noco.noco_config import get_proxies, STEAM_COOKIE
 from plugins.error_logger import log_error
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -202,10 +202,12 @@ def get_popular_tags(appid: int | str) -> dict[str, Any]:
             "headers": {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
+                "Chrome/120.0.0.0 Safari/537.36",
             },
             "timeout": 15,
         }
+        if STEAM_COOKIE:
+            request_kwargs["headers"]["Cookie"] = STEAM_COOKIE
         proxy_cfg = get_proxies()
         if proxy_cfg:
             request_kwargs["proxies"] = proxy_cfg
