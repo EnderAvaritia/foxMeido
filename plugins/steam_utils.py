@@ -1,11 +1,10 @@
 """
-noco_utils.py - 通用工具函数
-
-非 NocoDB 专属的通用工具，放在 plugins/ 层级供所有模块引用。
+steam_utils.py - Steam 通用工具函数
 
 包含：
-- get_game_info()    — 通过 Steam Web API 查询游戏信息
-- extract_steam_id() — 从文本/URL 提取 Steam AppID
+- get_game_info()     — 通过 Steam Web API 查询游戏信息
+- get_popular_tags()  — 从商店页面提取热门用户自定义标签
+- extract_steam_id()  — 从文本/URL 提取 Steam AppID
 """
 
 from __future__ import annotations
@@ -17,6 +16,8 @@ from typing import Any
 import urllib3
 
 import requests
+
+from bs4 import BeautifulSoup
 
 from plugins.noco.noco_config import get_proxies
 from plugins.error_logger import log_error
@@ -176,3 +177,114 @@ def extract_steam_id(text: str) -> str | None:
     if match:
         return tuple(item for item in match[0] if item)[0]
     return None
+
+
+def get_popular_tags(appid: int | str) -> dict[str, Any]:
+    """
+    从 Steam 商店页面提取"该产品的热门用户自定义标签"。
+
+    优先从页面中 InitAppTagModal() 调用提取 JSON 数据（含 tagid、name、count），
+    提取失败时退而求其次从 a.app_tag 元素获取纯文本标签名。
+
+    Args:
+        appid: Steam AppID。
+
+    Returns:
+        dict: 包含 tags（list[str]）的字典，出错时含 error 键。
+    """
+    tags: list[str] = []
+    errors: list[str] = []
+
+    url = f"https://store.steampowered.com/app/{appid}/"
+
+    try:
+        request_kwargs: dict[str, Any] = {
+            "headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            },
+            "timeout": 15,
+        }
+        proxy_cfg = get_proxies()
+        if proxy_cfg:
+            request_kwargs["proxies"] = proxy_cfg
+            request_kwargs["verify"] = False
+        response = requests.get(url, **request_kwargs)
+        response.raise_for_status()
+
+        html = response.text
+
+        # 方法 1：从 InitAppTagModal() 提取 JSON 数据
+        tags = _extract_from_init_tag_modal(html, str(appid))
+
+        if tags:
+            return {"tags": tags}
+
+        # 方法 2：退而求其次，从 a.app_tag 元素提取
+        tags = _extract_from_app_tag_elements(html)
+
+        if tags:
+            return {"tags": tags}
+
+        errors.append("页面中未找到标签数据，页面结构可能已变更")
+
+    except requests.exceptions.RequestException as e:
+        errors.append(f"请求商店页面时发生网络错误: {e}")
+    except Exception as e:
+        errors.append(f"提取标签时发生未知错误: {e}")
+
+    return {"tags": tags, "error": "; ".join(errors) if errors else None}
+
+
+def _extract_from_init_tag_modal(html: str, appid: str) -> list[str]:
+    """
+    从 InitAppTagModal(appid, ...) 调用中提取标签列表。
+
+    页面中含有的调用示例：
+        InitAppTagModal( 730,
+            {"tagid":1662,"name":"Survival","count":283,"browseable":true},
+            {"tagid":1659,"name":"Zombies","count":274,"browseable":true},
+            ...
+        )
+    """
+    start_tag = f"InitAppTagModal( {appid},"
+    end_tag = "],"
+
+    start = html.find(start_tag)
+    if start == -1:
+        return []
+
+    start += len(start_tag)
+    end = html.find(end_tag, start)
+    if end == -1:
+        return []
+
+    raw = html[start:end] + "]"
+    try:
+        tag_objects = json.loads(raw)
+        return [obj["name"] for obj in tag_objects if "name" in obj]
+    except (json.JSONDecodeError, TypeError, KeyError):
+        return []
+
+
+def _extract_from_app_tag_elements(html: str) -> list[str]:
+    """
+    从 a.app_tag 元素中提取标签列表。
+
+    页面中含有的元素示例：
+        <a class="app_tag">Survival</a>
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    tag_elements = soup.select("a.app_tag")
+    if not tag_elements:
+        return []
+
+    seen: set[str] = set()
+    tags: list[str] = []
+    for elem in tag_elements:
+        name = elem.get_text(strip=True)
+        if name and name not in seen:
+            seen.add(name)
+            tags.append(name)
+    return tags
