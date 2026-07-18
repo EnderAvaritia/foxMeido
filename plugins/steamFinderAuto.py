@@ -88,7 +88,7 @@ async def get_message(goodId):
     else:
         pic = '截图超时，请联系'
         
-    return f'游戏名：{gameInfo["game_name"]}\n支持语言：{gameInfo["supported_languages"]}\n发售日期：{gameInfo["release_date"]}\n发行商：{gameInfo["publisher"]}{price_format}\nSteam商店页链接：https://store.steampowered.com/app/{appid}\n' + pic        
+    return f'游戏名：{gameInfo["game_name"]}\n类型：{gameInfo["genres"]}\n支持语言：{gameInfo["supported_languages"]}\n发售日期：{gameInfo["release_date"]}\n发行商：{gameInfo["publisher"]}{price_format}\nSteam商店页链接：https://store.steampowered.com/app/{appid}\n' + pic        
 
 # async def fetch_title(url: str) -> str:
     # proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}

@@ -160,6 +160,7 @@ async def get_choice(number: int):
 
     info_text = (
         f'游戏名：{gameInfo["game_name"]}'
+        f'\n类型：{gameInfo["genres"]}'
         f'\n支持语言：{gameInfo["supported_languages"]}'
         f'\n发售日期：{gameInfo["release_date"]}'
         f'\n发行商：{gameInfo["publisher"]}'

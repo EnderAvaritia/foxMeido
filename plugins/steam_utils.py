@@ -26,19 +26,20 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def get_game_info(appid: int | str) -> dict[str, Any]:
     """
-    通过 Steam Web API 获取游戏名称、厂商名、发行日期、支持语言和价格信息。
+    通过 Steam Web API 获取游戏名称、厂商名、发行日期、支持语言、类型和价格信息。
 
     Args:
         appid: Steam AppID。
 
     Returns:
         dict: 包含 game_name、publisher、release_date、supported_languages、
-              initial、final、currency 的字典，出错时含 error 键。
+              genres、initial、final、currency 的字典，出错时含 error 键。
     """
     game_name: str | None = None
     publisher: str | None = None
     release_date: str | None = None
     supported_languages: str | None = None
+    genres: str | None = None
     initial: float = 1
     final: float = 1
     currency: str | None = None
@@ -100,6 +101,15 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
                         f"API返回的支持语言为空 (AppID: {appid})"
                     )
 
+                # 类型（genres）
+                raw_genres = details.get("genres")
+                if raw_genres:
+                    genres = ", ".join(g.get("description", "") for g in raw_genres)
+                else:
+                    errors.append(
+                        f"API返回的类型列表为空 (AppID: {appid})"
+                    )
+
                 # 价格信息
                 try:
                     price = details.get("price_overview")
@@ -141,6 +151,7 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
         "publisher": publisher,
         "release_date": release_date,
         "supported_languages": supported_languages,
+        "genres": genres,
         "initial": initial,
         "final": final,
         "currency": currency,
