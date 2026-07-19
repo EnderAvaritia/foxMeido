@@ -168,6 +168,63 @@ async def ensure_browser():
         return False
 
 
+async def create_context(
+    viewport_size: dict | None = None,
+    cookie_file: str | None = None,
+) -> object | None:
+    """
+    从全局浏览器创建一个独立上下文（含代理配置），可选加载指定 cookie 文件。
+
+    调用方负责关闭 context（``await context.close()``）。
+    并发安全 —— 各请求使用不同 context 实例。
+
+    Args:
+        viewport_size: 可选视口尺寸。
+        cookie_file: 可选的 cookie 文件相对路径（项目根目录相对）。
+                     不设则按 PLAYWRIGHT_COOKIE_FILE 加载。
+
+    Returns:
+        BrowserContext | None
+    """
+    if not await ensure_browser():
+        return None
+    try:
+        ctx_kwargs = {}
+        proxy = get_http_proxy()
+        if proxy:
+            ctx_kwargs["proxy"] = {"server": proxy}
+        context = await _browser.new_context(**ctx_kwargs)
+        if cookie_file:
+            await _load_cookie_from_file(context, cookie_file)
+        else:
+            await load_cookie_file(context)
+        return context
+    except Exception as e:
+        log_error("create_context", f"上下文创建失败: {e}")
+        return None
+
+
+async def _load_cookie_from_file(context, rel_path: str) -> None:
+    """从指定相对路径加载 cookie JSON 到 context。"""
+    fpath = os.path.join(_project_root(), rel_path)
+    if not os.path.isfile(fpath):
+        log_error("_load_cookie_from_file", f"Cookie 文件不存在: {fpath}")
+        return
+    try:
+        with open(fpath, "r", encoding="utf-8") as f:
+            cookies = json.load(f)
+        if not isinstance(cookies, list):
+            log_error("_load_cookie_from_file",
+                      f"Cookie 文件格式错误：需要 JSON 数组，得到 {type(cookies).__name__}")
+            return
+        await context.add_cookies(cookies)
+        print(f"[playwright] 已加载 {len(cookies)} 个 cookie（{rel_path}）")
+    except json.JSONDecodeError as e:
+        log_error("_load_cookie_from_file", f"Cookie 文件 JSON 解析失败: {e}")
+    except Exception as e:
+        log_error("_load_cookie_from_file", f"Cookie 加载异常: {e}")
+
+
 async def create_page(viewport_size: dict | None = None):
     """
     从全局浏览器创建一个新页面（含代理配置）。

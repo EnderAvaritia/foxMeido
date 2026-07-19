@@ -38,6 +38,7 @@ from nonebot.exception import FinishedException
 
 from plugins.noco.noco_config import get_proxies
 from plugins.message_reaction import reaction_cleanup
+from plugins.playwright_utils import ensure_browser, create_context
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler  # noqa: E402
@@ -47,6 +48,12 @@ from nonebot_plugin_apscheduler import scheduler  # noqa: E402
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "db" / "curator_state.db"
 CST = timezone(timedelta(hours=8))
+
+# ── 自定义异常 ──────────────────────────────────────────────────
+class CookieExpiredError(Exception):
+    """CURATOR_COOKIE / CURATOR_COOKIE_FILE 已过期，需要重新获取。"""
+    pass
+
 
 # ── 默认 ──────────────────────────────────────────────────────────
 curator_cmd = on_startswith("pending", ignorecase=False, priority=20, block=True)
@@ -80,6 +87,7 @@ def _read_dotenv(key: str) -> str:
 def get_config() -> dict[str, Any]:
     """读取插件所需的所有配置项。"""
     cookie = _read_dotenv("CURATOR_COOKIE")
+    cookie_file = _read_dotenv("CURATOR_COOKIE_FILE")
     curator_id = _read_dotenv("CURATOR_ID")
     curator_name = _read_dotenv("CURATOR_NAME") or "鉴赏家"
     notify_group = _read_dotenv("CURATOR_NOTIFY_GROUP")
@@ -89,6 +97,7 @@ def get_config() -> dict[str, Any]:
 
     return {
         "cookie": cookie,
+        "cookie_file": cookie_file,
         "curator_id": curator_id,
         "curator_name": curator_name,
         "notify_group": notify_group,
@@ -99,9 +108,10 @@ def get_config() -> dict[str, Any]:
 
 
 def is_configured() -> bool:
-    """检查配置是否足以运行。"""
+    """检查配置是否足以运行（CURATOR_COOKIE_FILE 或 CURATOR_COOKIE 任一 + CURATOR_ID）。"""
     cfg = get_config()
-    return bool(cfg["cookie"] and cfg["curator_id"])
+    has_auth = bool(cfg["cookie_file"]) or bool(cfg["cookie"])
+    return has_auth and bool(cfg["curator_id"])
 
 
 # ── Cookie 解析 ──────────────────────────────────────────────────
@@ -201,12 +211,71 @@ def build_url(curator_id: str, curator_name: str) -> str:
             f"{curator_id}-{name_encoded}/admin/pending?ajax=1")
 
 
-def fetch_pending_html(curator_id: str, curator_name: str,
-                       cookie_str: str) -> str:
-    """抓取 pending 页面，返回 HTML 文本。"""
-    url = build_url(curator_id, curator_name)
-    proxies = get_proxies()
+async def fetch_pending_html(curator_id: str, curator_name: str,
+                              cookie_str: str, cookie_file: str) -> str:
+    """
+    抓取 pending 页面，返回 HTML 文本。
 
+    优先使用 Playwright + CURATOR_COOKIE_FILE（更稳定，session 维持更久）。
+    降级使用 requests + CURATOR_COOKIE（旧方式，静态 Cookie）。
+    """
+    url = build_url(curator_id, curator_name)
+
+    if cookie_file:
+        return await _fetch_pending_with_playwright(url, cookie_file)
+    else:
+        return _fetch_pending_with_requests(url, cookie_str)
+
+
+# ── Playwright 路径 ──────────────────────────────────────────────
+_LOGIN_TITLES = {"sign in", "login", "welcome to steam"}
+
+
+async def _fetch_pending_with_playwright(url: str, cookie_file: str) -> str:
+    """通过 Playwright 加载 pending 页面，自动使用 cookie 文件维持登录态。"""
+    if not await ensure_browser():
+        raise RuntimeError("浏览器启动失败")
+
+    context = await create_context(cookie_file=cookie_file)
+    if context is None:
+        raise RuntimeError("创建浏览器上下文失败")
+
+    page = await context.new_page()
+    try:
+        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+
+        # 过期检测：检查页面标题是否为登录页
+        title = await page.title()
+        title_lower = title.strip().lower()
+        for keyword in _LOGIN_TITLES:
+            if keyword in title_lower:
+                raise CookieExpiredError(
+                    "CURATOR_COOKIE_FILE 已过期（检测到登录页），"
+                    "请重新运行 python scripts/get_curator_cookies.py")
+
+        # 额外检测：URL 是否被重定向到登录页
+        current_url = page.url
+        if "login" in current_url.lower():
+            raise CookieExpiredError(
+                "CURATOR_COOKIE_FILE 已过期（被重定向到登录页），"
+                "请重新运行 python scripts/get_curator_cookies.py")
+
+        html = await page.content()
+        return html
+
+    except CookieExpiredError:
+        raise
+    except Exception as e:
+        logger.error(f"Playwright 抓取 pending 页面失败: {e}")
+        raise RuntimeError(f"Playwright 抓取 pending 页面失败: {e}") from e
+    finally:
+        await context.close()
+
+
+# ── requests 降级路径 ────────────────────────────────────────────
+def _fetch_pending_with_requests(url: str, cookie_str: str) -> str:
+    """通过 requests 加载 pending 页面（旧方式，使用静态 Cookie）。"""
+    proxies = get_proxies()
     headers = {
         "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:150.0) "
                        "Gecko/20100101 Firefox/150.0"),
@@ -220,7 +289,28 @@ def fetch_pending_html(curator_id: str, curator_name: str,
     resp = requests.get(url, headers=headers, proxies=proxies, timeout=30,
                         verify=not bool(proxies))
     resp.raise_for_status()
+
+    # 过期检测：检查响应是否包含登录页特征
+    text_lower = resp.text.lower()
+    if _is_login_page(text_lower):
+        raise CookieExpiredError(
+            "CURATOR_COOKIE 已过期（检测到登录页），"
+            "建议改用 CURATOR_COOKIE_FILE 配合 Playwright 获取方式，"
+            "或重新从浏览器复制 CURATOR_COOKIE")
+
     return resp.text
+
+
+def _is_login_page(html_lower: str) -> bool:
+    """检测 HTML 是否属于 Steam 登录页面（而非正常 pending 页面）。"""
+    # 登录页特征：title 或 URL 包含登录关键词
+    for keyword in _LOGIN_TITLES:
+        if keyword in html_lower:
+            return True
+    # 额外的: pending 页面包含 sessionid 在正常内容中，登录页没有
+    if "login" in html_lower and "pending" not in html_lower:
+        return True
+    return False
 
 
 # ── HTML 解析 ─────────────────────────────────────────────────────
@@ -291,10 +381,11 @@ def detect_changes(
 
 
 # ── 执行检查 ──────────────────────────────────────────────────────
-def run_check() -> CheckResult:
+async def run_check() -> CheckResult:
     """执行一次完整的检查流程。"""
     cfg = get_config()
-    html = fetch_pending_html(cfg["curator_id"], cfg["curator_name"], cfg["cookie"])
+    html = await fetch_pending_html(
+        cfg["curator_id"], cfg["curator_name"], cfg["cookie"], cfg["cookie_file"])
     result = parse_pending_page(html)
 
     seen = load_seen_games()
@@ -433,7 +524,7 @@ async def handle_curator(bot, event):
 
     if not is_configured():
         if cleanup: await cleanup()
-        await curator_cmd.finish("⚠️ 未配置 CURATOR_COOKIE 和 CURATOR_ID，请先设置 .env")
+        await curator_cmd.finish("⚠️ 未配置 CURATOR_COOKIE_FILE 或 CURATOR_COOKIE，请先设置 .env")
 
     if is_test:
         cfg = get_config()
@@ -460,11 +551,14 @@ async def handle_curator(bot, event):
 
     # 执行检查（不再发"正在检查"，✅表情即为响应）
     try:
-        result = run_check()
+        result = await run_check()
         cfg = get_config()
         msg = format_result(result, cfg["curator_name"])
         if cleanup: await cleanup()
         await curator_cmd.finish(msg, at_sender=False)
+    except CookieExpiredError as e:
+        if cleanup: await cleanup()
+        await curator_cmd.finish(f"❌ {e}", at_sender=False)
     except requests.RequestException as e:
         if cleanup: await cleanup()
         await curator_cmd.finish(f"❌ 网络请求失败: {e}", at_sender=False)
@@ -499,7 +593,7 @@ async def scheduled_check():
 
     logger.info("定时检查：开始执行")
     try:
-        result = run_check()
+        result = await run_check()
         if not result.new_games and not result.updated_games:
             logger.info("无变化，跳过推送")
             return

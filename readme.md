@@ -120,12 +120,24 @@ PLAYWRIGHT_COOKIE_FILE=data/cookies/steam_playwright.json
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `CURATOR_COOKIE` | — | Steam **鉴赏家后台** Cookie（与商店 cookie 不同），必须包含 `sessionid` 和 `steamLoginSecure`。从浏览器访问 `store.steampowered.com/curator/{id}/admin` → F12 → 复制请求头 `Cookie:` |
+| `CURATOR_COOKIE_FILE` | — | **（推荐）** Playwright 格式的 Cookie 文件路径（JSON），通过 `python scripts/get_curator_cookies.py` 获取。bot 运行时通过 Playwright 加载，session 维持更久 |
+| `CURATOR_COOKIE` | — | **（旧方式/降级）** 静态 Cookie 字符串，从浏览器复制。仅在未设置 `CURATOR_COOKIE_FILE` 时使用 |
 | `CURATOR_ENABLED` | `false` | 是否启用每日定时检查 |
 | `CURATOR_NAME` | `鉴赏家` | 鉴赏家显示名称 |
 | `CURATOR_NOTIFY_GROUP` | — | 每日定时推送的目标群号 |
 | `CURATOR_CHECK_TIME` | `09:00` | 每日定时检查时间 |
 | `CURATOR_NTFY_TOPIC` | — | ntfy topic，设了则额外推送到手机 |
+
+**推荐设置方式：**
+
+```bash
+# 1. 运行获取脚本（弹出浏览器 → 登录 Steam → 导航到鉴赏家后台 → 回车）
+python scripts/get_curator_cookies.py
+
+# 2. 在 .env 中添加：
+CURATOR_COOKIE_FILE=data/cookies/curator_playwright.json
+CURATOR_ID=你的鉴赏家ID
+```
 
 **命令：**
 
@@ -153,7 +165,11 @@ PLAYWRIGHT_COOKIE_FILE=data/cookies/steam_playwright.json
 探测结果为空                     ← Cookie 过期或页面抓取失败
 ```
 
-`累计` 为 SQLite 中累积的唯一游戏总数（不会回缩）。出现**探测结果为空**请检查 `CURATOR_COOKIE` 是否过期。
+`累计` 为 SQLite 中累积的唯一游戏总数（不会回缩）。
+
+**Cookie 过期提示：**
+- 使用 `CURATOR_COOKIE_FILE`（Playwright 方式）时，如果 cookie 过期，系统会自动检测登录页面，提示 `❌ CURATOR_COOKIE_FILE 已过期，请重新运行 python scripts/get_curator_cookies.py`
+- 使用 `CURATOR_COOKIE`（旧方式）时，同样会检测登录页并给出提示，建议迁移到 Playwright 方式
 
 ### 消息表情回复（可选）
 
