@@ -150,26 +150,34 @@ async def get_choice(number: int):
     tags_result = get_popular_tags(appid)
 
     # 格式化价格
-    if gameInfo["currency"]:
+    if gameInfo.get("currency"):
+        discount = 100 - (gameInfo["final"] / gameInfo["initial"] * 100)
         price_format = (
-            f'\n原价：{str(gameInfo["initial"]) + gameInfo["currency"]}'
-            f'\n现价：{str(gameInfo["final"]) + gameInfo["currency"]}'
-            f'\n折扣：-{100 - (gameInfo["final"] / gameInfo["initial"] * 100):.0f}%'
+            f'原价：{gameInfo["initial"]}{gameInfo["currency"]}'
+            f'\n现价：{gameInfo["final"]}{gameInfo["currency"]}'
+            f'\n折扣：-{discount:.0f}%'
         )
     else:
         price_format = ""
 
-    tags_line = f'\n热门标签：{", ".join(tags_result["tags"][:12])}' if tags_result.get("tags") else ''
-    info_text = (
-        f'游戏名：{gameInfo["game_name"]}'
-        f'\n类型：{gameInfo["genres"]}'
-        f'{tags_line}'
-        f'\n支持语言：{gameInfo["supported_languages"]}'
-        f'\n发售日期：{gameInfo["release_date"]}'
-        f'\n发行商：{gameInfo["publisher"]}'
-        f'{price_format}'
-        f'\nSteam商店页链接：https://store.steampowered.com/app/{appid}'
-    )
+    # 条件构建输出行，缺失信息不输出对应行
+    lines = []
+    if gameInfo.get("game_name"):
+        lines.append(f'游戏名：{gameInfo["game_name"]}')
+    if gameInfo.get("genres"):
+        lines.append(f'类型：{gameInfo["genres"]}')
+    if tags_result.get("tags"):
+        lines.append(f'热门标签：{", ".join(tags_result["tags"][:12])}')
+    if gameInfo.get("supported_languages"):
+        lines.append(f'支持语言：{gameInfo["supported_languages"]}')
+    if gameInfo.get("release_date"):
+        lines.append(f'发售日期：{gameInfo["release_date"]}')
+    if gameInfo.get("publisher"):
+        lines.append(f'发行商：{gameInfo["publisher"]}')
+    if price_format:
+        lines.append(price_format)
+    lines.append(f'Steam商店页链接：https://store.steampowered.com/app/{appid}')
+    info_text = '\n'.join(lines)
 
     screenshot_bytes = await take_app_screenshot(appid)
     if screenshot_bytes:

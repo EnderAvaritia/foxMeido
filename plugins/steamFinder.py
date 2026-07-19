@@ -82,24 +82,40 @@ async def get_message(goodId):
     tags_result = get_popular_tags(appid)
     pic_data = await take_app_screenshot(appid)
     
-    #格式化价格
-    if gameInfo["currency"]:
+    # 格式化价格
+    if gameInfo.get("currency"):
+        discount = 100 - (gameInfo["final"] / gameInfo["initial"] * 100)
         price_format = (
-            f'\n原价：{str(gameInfo["initial"]) + gameInfo["currency"]}'
-            f'\n现价：{str(gameInfo["final"]) + gameInfo["currency"]}'
-            f'\n折扣：-{100 - (gameInfo["final"] / gameInfo["initial"] * 100):.0f}%'
+            f'\n原价：{gameInfo["initial"]}{gameInfo["currency"]}'
+            f'\n现价：{gameInfo["final"]}{gameInfo["currency"]}'
+            f'\n折扣：-{discount:.0f}%'
         )
-        print(price_format)
-    else :
-        price_format = ''
+    else:
+        price_format = ""
     
     if pic_data:
         pic = MessageSegment.image(f"base64://{base64.b64encode(pic_data).decode()}")
     else:
         pic = '截图超时，请联系'
     
-    tags_line = f'\n热门标签：{", ".join(tags_result["tags"][:12])}' if tags_result.get("tags") else ''
-    return f'游戏名：{gameInfo["game_name"]}\n类型：{gameInfo["genres"]}{tags_line}\n支持语言：{gameInfo["supported_languages"]}\n发售日期：{gameInfo["release_date"]}\n发行商：{gameInfo["publisher"]}{price_format}\nSteam商店页链接：https://store.steampowered.com/app/{appid}\n' + pic        
+    # 条件构建输出行，缺失信息不输出对应行
+    lines = []
+    if gameInfo.get("game_name"):
+        lines.append(f'游戏名：{gameInfo["game_name"]}')
+    if gameInfo.get("genres"):
+        lines.append(f'类型：{gameInfo["genres"]}')
+    if tags_result.get("tags"):
+        lines.append(f'热门标签：{", ".join(tags_result["tags"][:12])}')
+    if gameInfo.get("supported_languages"):
+        lines.append(f'支持语言：{gameInfo["supported_languages"]}')
+    if gameInfo.get("release_date"):
+        lines.append(f'发售日期：{gameInfo["release_date"]}')
+    if gameInfo.get("publisher"):
+        lines.append(f'发行商：{gameInfo["publisher"]}')
+    if price_format:
+        lines.append(price_format.lstrip("\n"))
+    lines.append(f'Steam商店页链接：https://store.steampowered.com/app/{appid}')
+    return '\n'.join(lines) + '\n' + pic        
 
 # async def fetch_title(url: str) -> str:
     # proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
