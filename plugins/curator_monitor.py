@@ -79,10 +79,48 @@ class CheckResult:
 
 
 # ── 配置读取 ──────────────────────────────────────────────────────
+_CURATOR_NAME_CACHE: str | None = None
+
+
 def _read_dotenv(key: str) -> str:
     """从 os.environ 或 .env 文件读配置（使用 noco_config 的读取方式）。"""
     from plugins.noco.noco_config import _read_dotenv as _noco_read
     return _noco_read(key)
+
+
+def _resolve_curator_name(curator_id: str) -> str:
+    """获取鉴赏家显示名称：优先 CURATOR_NAME，未设则从 Steam 页面自动抓取。"""
+    global _CURATOR_NAME_CACHE
+    if _CURATOR_NAME_CACHE is not None:
+        return _CURATOR_NAME_CACHE
+
+    env_name = _read_dotenv("CURATOR_NAME")
+    if env_name:
+        _CURATOR_NAME_CACHE = env_name
+        return env_name
+
+    # 自动探测：访问 curator 页面，从重定向 URL 提取名字
+    try:
+        from urllib.parse import unquote
+        proxies = get_proxies()
+        url = f"https://store.steampowered.com/curator/{curator_id}/"
+        resp = requests.get(
+            url, proxies=proxies, timeout=10,
+            allow_redirects=True,
+            verify=not bool(proxies),
+        )
+        # Steam 重定向到 /curator/{ID}-{name}/
+        m = re.search(r"/curator/\d+-(.+?)(?:/|$)", resp.url)
+        if m:
+            name = unquote(m.group(1))
+            _CURATOR_NAME_CACHE = name
+            logger.info("鉴赏家名字自动探测: %s", name)
+            return name
+    except Exception as e:
+        logger.warning("鉴赏家名字自动探测失败: %s", e)
+
+    _CURATOR_NAME_CACHE = "鉴赏家"
+    return _CURATOR_NAME_CACHE
 
 
 def get_config() -> dict[str, Any]:
@@ -90,7 +128,7 @@ def get_config() -> dict[str, Any]:
     cookie = _read_dotenv("CURATOR_COOKIE")
     cookie_file = _read_dotenv("CURATOR_COOKIE_FILE")
     curator_id = _read_dotenv("CURATOR_ID")
-    curator_name = _read_dotenv("CURATOR_NAME") or "鉴赏家"
+    curator_name = _resolve_curator_name(curator_id)
     notify_group = _read_dotenv("CURATOR_NOTIFY_GROUP")
     notify_user = _read_dotenv("CURATOR_NOTIFY_USER")
     check_time = _read_dotenv("CURATOR_CHECK_TIME") or "09:00"
@@ -208,10 +246,9 @@ def _parse_copies(text: str) -> int:
 
 # ── Steam 页面抓取 ────────────────────────────────────────────────
 def build_url(curator_id: str, curator_name: str) -> str:
-    from urllib.parse import quote
-    name_encoded = quote(curator_name)
+    """构造 pending 页面 AJAX URL（只用 ID，名字仅作 fallback）。"""
     return (f"https://store.steampowered.com/curator/"
-            f"{curator_id}-{name_encoded}/admin/pending?ajax=1")
+            f"{curator_id}/admin/pending?ajax=1")
 
 
 async def fetch_pending_html(curator_id: str, curator_name: str,
