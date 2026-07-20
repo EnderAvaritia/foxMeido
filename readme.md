@@ -125,6 +125,7 @@ PLAYWRIGHT_COOKIE_FILE=data/cookies/steam_playwright.json
 | `CURATOR_ENABLED` | `false` | 是否启用每日定时检查 |
 | `CURATOR_NAME` | `鉴赏家` | 鉴赏家显示名称 |
 | `CURATOR_NOTIFY_GROUP` | — | 每日定时推送的目标群号 |
+| `CURATOR_NOTIFY_USER` | — | 每日定时推送的目标 QQ 号（可选，与 GROUP 可同时设置） |
 | `CURATOR_CHECK_TIME` | `09:00` | 每日定时检查时间 |
 | `CURATOR_NTFY_TOPIC` | — | ntfy topic，设了则额外推送到手机 |
 

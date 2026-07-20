@@ -13,7 +13,8 @@ Steam 鉴赏家待处理副本监控 - NoneBot2 插件
   CURATOR_ID             — 鉴赏家 ID
   CURATOR_NAME           — 鉴赏家名称（可选，默认 "鉴赏家"）
   CURATOR_ENABLED       — 是否启用每日定时检查（默认 false）
-  CURATOR_NOTIFY_GROUP   — 每日定时推送的目标群号（可选，不设则不推）
+  CURATOR_NOTIFY_GROUP   — 每日定时推送的目标群号（可选）
+  CURATOR_NOTIFY_USER    — 每日定时推送的目标 QQ 号（可选，与 GROUP 可同时设置）
   CURATOR_CHECK_TIME     — 每日定时检查时间，格式 HH:MM（默认 09:00）
   CURATOR_NTFY_TOPIC     — ntfy topic（可选，设了则额外推送到 ntfy）
 """
@@ -91,6 +92,7 @@ def get_config() -> dict[str, Any]:
     curator_id = _read_dotenv("CURATOR_ID")
     curator_name = _read_dotenv("CURATOR_NAME") or "鉴赏家"
     notify_group = _read_dotenv("CURATOR_NOTIFY_GROUP")
+    notify_user = _read_dotenv("CURATOR_NOTIFY_USER")
     check_time = _read_dotenv("CURATOR_CHECK_TIME") or "09:00"
     ntfy_topic = _read_dotenv("CURATOR_NTFY_TOPIC")
     enabled = _read_dotenv("CURATOR_ENABLED") in ("true", "1", "yes")
@@ -101,6 +103,7 @@ def get_config() -> dict[str, Any]:
         "curator_id": curator_id,
         "curator_name": curator_name,
         "notify_group": notify_group,
+        "notify_user": notify_user,
         "check_time": check_time,
         "ntfy_topic": ntfy_topic,
         "enabled": enabled,
@@ -512,6 +515,15 @@ async def send_to_group(group_id: str, message: str) -> None:
         logger.error(f"发送群消息失败 (group={group_id}): {e}")
 
 
+async def send_to_user(user_id: str, message: str) -> None:
+    """向指定 QQ 用户发送私聊消息。"""
+    try:
+        bot = get_bot()
+        await bot.call_api("send_private_msg", user_id=int(user_id), message=message)
+    except Exception as e:
+        logger.error(f"发送私聊消息失败 (user={user_id}): {e}")
+
+
 # ── 手动命令 ──────────────────────────────────────────────────────
 @curator_cmd.handle()
 async def handle_curator(bot, event):
@@ -580,11 +592,13 @@ def _parse_check_time(time_str: str) -> tuple[int, int]:
 
 
 async def scheduled_check():
-    """定时任务：每日检查待处理副本并推送到指定群。"""
+    """定时任务：每日检查待处理副本并推送到指定群/用户。"""
     cfg = get_config()
     notify_group = cfg["notify_group"]
-    if not notify_group:
-        logger.info("CURATOR_NOTIFY_GROUP 未配置，跳过定时推送")
+    notify_user = cfg["notify_user"]
+
+    if not notify_group and not notify_user:
+        logger.info("CURATOR_NOTIFY_GROUP 和 CURATOR_NOTIFY_USER 均未配置，跳过定时推送")
         return
 
     if not is_configured():
@@ -598,10 +612,17 @@ async def scheduled_check():
             logger.info("无变化，跳过推送")
             return
         msg = format_result(result, cfg["curator_name"])
-        await send_to_group(notify_group, msg)
+        if notify_group:
+            await send_to_group(notify_group, msg)
+        if notify_user:
+            await send_to_user(notify_user, msg)
     except Exception as e:
         logger.exception(f"定时检查异常: {e}")
-        await send_to_group(notify_group, f"❌ 鉴赏家副本检查异常: {e}")
+        err_msg = f"❌ 鉴赏家副本检查异常: {e}"
+        if notify_group:
+            await send_to_group(notify_group, err_msg)
+        if notify_user:
+            await send_to_user(notify_user, err_msg)
 
 
 # ── 插件初始化 ────────────────────────────────────────────────────
