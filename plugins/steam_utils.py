@@ -25,9 +25,37 @@ from plugins.error_logger import log_error
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
+def _fetch_app_data(appid: int | str, cc: str = "") -> dict[str, Any] | None:
+    """请求 Steam API，返回 app_data dict 或 None（success=false）。"""
+    cc_param = f"&cc={cc}" if cc else ""
+    api_url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=schinese{cc_param}"
+    request_kwargs: dict[str, Any] = {
+        "headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        },
+        "timeout": 15,
+    }
+    proxy_cfg = get_proxies()
+    if proxy_cfg:
+        request_kwargs["proxies"] = proxy_cfg
+        request_kwargs["verify"] = False
+    response = requests.get(api_url, **request_kwargs)
+    response.raise_for_status()
+    data = response.json()
+    app_data = data.get(str(appid))
+    if app_data and app_data.get("success"):
+        return app_data.get("data")
+    return None
+
+
 def get_game_info(appid: int | str) -> dict[str, Any]:
     """
     通过 Steam Web API 获取游戏名称、厂商名、发行日期、支持语言、类型和价格信息。
+
+    如果设置了 STEAM_CC 且目标区返回 success=false（锁区），
+    自动降级到不带 cc 参数重新请求。
 
     Args:
         appid: Steam AppID。
@@ -46,93 +74,76 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
     currency: str | None = None
     errors: list[str] = []
 
-    cc_param = f"&cc={STEAM_CC}" if STEAM_CC else ""
-    api_url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=schinese{cc_param}"
-
     try:
-        request_kwargs: dict[str, Any] = {
-            "headers": {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            },
-            "timeout": 15,
-        }
-        proxy_cfg = get_proxies()
-        if proxy_cfg:
-            request_kwargs["proxies"] = proxy_cfg
-            request_kwargs["verify"] = False
-        response = requests.get(api_url, **request_kwargs)
-        response.raise_for_status()
-        data = response.json()
-        app_data = data.get(str(appid))
+        # 第一次请求：带 STEAM_CC（如果有的话）
+        details = _fetch_app_data(appid, STEAM_CC)
 
-        if app_data and app_data.get("success"):
-            details = app_data.get("data")
-            if details:
-                game_name = details.get("name")
-                if not game_name:
-                    errors.append(
-                        f"API返回数据中未找到'name'信息 (AppID: {appid})"
-                    )
+        # 如果带 cc 失败（锁区），且 STEAM_CC 有值，降级重试（静默，不污染 errors）
+        if details is None and STEAM_CC:
+            log_error("steam_utils.get_game_info",
+                       f"STEAM_CC={STEAM_CC} 目标区不可用 (AppID: {appid})，降级到默认区域")
+            details = _fetch_app_data(appid)
 
-                publishers = details.get("publishers")
-                if publishers:
-                    publisher = ", ".join(publishers)
+        if details is not None:
+            game_name = details.get("name")
+            if not game_name:
+                errors.append(
+                    f"API返回数据中未找到'name'信息 (AppID: {appid})"
+                )
+
+            publishers = details.get("publishers")
+            if publishers:
+                publisher = ", ".join(publishers)
+            else:
+                errors.append(
+                    f"API返回的厂商列表为空 (AppID: {appid})"
+                )
+
+            rd = details.get("release_date")
+            if rd and rd.get("date"):
+                release_date = rd["date"]
+            else:
+                errors.append(
+                    f"API返回的发行日期为空 (AppID: {appid})"
+                )
+
+            # 支持语言
+            raw_lang = details.get("supported_languages")
+            if raw_lang:
+                supported_languages = re.sub(
+                    "<.*?>", "", raw_lang
+                ).replace("*", "").replace("具有完全音频支持的语言", "")
+            else:
+                errors.append(
+                    f"API返回的支持语言为空 (AppID: {appid})"
+                )
+
+            # 类型（genres）
+            raw_genres = details.get("genres")
+            if raw_genres:
+                genres = ", ".join(g.get("description", "") for g in raw_genres)
+            else:
+                errors.append(
+                    f"API返回的类型列表为空 (AppID: {appid})"
+                )
+
+            # 价格信息
+            try:
+                price = details.get("price_overview")
+                if price:
+                    initial = int(price.get("initial", 0)) / 100
+                    final = int(price.get("final", 0)) / 100
+                    currency = price.get("currency")
                 else:
-                    errors.append(
-                        f"API返回的厂商列表为空 (AppID: {appid})"
-                    )
-
-                rd = details.get("release_date")
-                if rd and rd.get("date"):
-                    release_date = rd["date"]
-                else:
-                    errors.append(
-                        f"API返回的发行日期为空 (AppID: {appid})"
-                    )
-
-                # 支持语言
-                raw_lang = details.get("supported_languages")
-                if raw_lang:
-                    supported_languages = re.sub(
-                        "<.*?>", "", raw_lang
-                    ).replace("*", "").replace("具有完全音频支持的语言", "")
-                else:
-                    errors.append(
-                        f"API返回的支持语言为空 (AppID: {appid})"
-                    )
-
-                # 类型（genres）
-                raw_genres = details.get("genres")
-                if raw_genres:
-                    genres = ", ".join(g.get("description", "") for g in raw_genres)
-                else:
-                    errors.append(
-                        f"API返回的类型列表为空 (AppID: {appid})"
-                    )
-
-                # 价格信息
-                try:
-                    price = details.get("price_overview")
-                    if price:
-                        initial = int(price.get("initial", 0)) / 100
-                        final = int(price.get("final", 0)) / 100
-                        currency = price.get("currency")
-                    else:
-                        initial = 1
-                        final = 1
-                        currency = None
-                except Exception as e:
-                    errors.append(f"解析价格异常 (AppID: {appid}): {e}")
-                    log_error("steam_utils.get_game_info", f"价格异常: {e}")
                     initial = 1
                     final = 1
                     currency = None
-            else:
-                errors.append(
-                    f"API返回数据中未找到'data'详情 (AppID: {appid})"
-                )
+            except Exception as e:
+                errors.append(f"解析价格异常 (AppID: {appid}): {e}")
+                log_error("steam_utils.get_game_info", f"价格异常: {e}")
+                initial = 1
+                final = 1
+                currency = None
         else:
             errors.append(
                 f"API返回成功状态为false或数据为空 (AppID: {appid})。"
