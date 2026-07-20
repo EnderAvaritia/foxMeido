@@ -123,7 +123,7 @@ PLAYWRIGHT_COOKIE_FILE=data/cookies/steam_playwright.json
 | `CURATOR_COOKIE_FILE` | — | **（推荐）** Playwright 格式的 Cookie 文件路径（JSON），通过 `python scripts/get_curator_cookies.py` 获取。bot 运行时通过 Playwright 加载，session 维持更久 |
 | `CURATOR_COOKIE` | — | **（旧方式/降级）** 静态 Cookie 字符串，从浏览器复制。仅在未设置 `CURATOR_COOKIE_FILE` 时使用 |
 | `CURATOR_ENABLED` | `false` | 是否启用每日定时检查 |
-| `CURATOR_NAME` | `鉴赏家` | 鉴赏家显示名称 |
+| `CURATOR_NAME` | 自动探测 | 鉴赏家显示名称。不设则自动从 Steam 页面抓取 |
 | `CURATOR_NOTIFY_GROUP` | — | 每日定时推送的目标群号 |
 | `CURATOR_NOTIFY_USER` | — | 每日定时推送的目标 QQ 号（可选，与 GROUP 可同时设置） |
 | `CURATOR_CHECK_TIME` | `09:00` | 每日定时检查时间 |
