@@ -85,6 +85,7 @@ COMMAND_START=[""]
 | 变量 | 说明 |
 |------|------|
 | `STEAM_COOKIE` | Steam **商店页面** Cookie，`wish` 功能和热门标签提取需要。从浏览器访问 store.steampowered.com → F12 → 复制请求头 `Cookie:` 整行。格式：`sessionid=xxx; steamLogin=xxx; ...` |
+| `STEAM_CC` | 目标国家/地区码，控制 Steam API 返回的货币和区域定价。如 `cn` → 人民币、`us` → 美元、`jp` → 日元。留空则按出口 IP 自动决定 |
 | `CURATOR_ID` | Steam 鉴赏家 ID（unreported 功能需要） |
 
 ### Playwright（可选）

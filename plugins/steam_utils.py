@@ -19,7 +19,7 @@ import requests
 
 from bs4 import BeautifulSoup
 
-from plugins.noco.noco_config import get_proxies, STEAM_COOKIE
+from plugins.noco.noco_config import get_proxies, STEAM_COOKIE, STEAM_CC
 from plugins.error_logger import log_error
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -46,7 +46,8 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
     currency: str | None = None
     errors: list[str] = []
 
-    api_url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=schinese"
+    cc_param = f"&cc={STEAM_CC}" if STEAM_CC else ""
+    api_url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=schinese{cc_param}"
 
     try:
         request_kwargs: dict[str, Any] = {

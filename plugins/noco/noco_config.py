@@ -165,6 +165,7 @@ if HTTP_PROXY:
 
 # ── Steam ────────────────────────────────────────────────────
 STEAM_COOKIE: str = _read_dotenv("STEAM_COOKIE") or ""
+STEAM_CC: str = _read_dotenv("STEAM_CC") or ""
 CURATOR_ID: int = int(_read_dotenv("CURATOR_ID") or "0")
 
 
