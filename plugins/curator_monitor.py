@@ -99,7 +99,7 @@ def _resolve_curator_name(curator_id: str) -> str:
         _CURATOR_NAME_CACHE = env_name
         return env_name
 
-    # 自动探测：访问 curator 页面，从重定向 URL 提取名字
+    # 自动探测：访问 curator 页面，从 HTML 或重定向 URL 提取名字
     try:
         from urllib.parse import unquote
         proxies = get_proxies()
@@ -109,12 +109,23 @@ def _resolve_curator_name(curator_id: str) -> str:
             allow_redirects=True,
             verify=not bool(proxies),
         )
-        # Steam 重定向到 /curator/{ID}-{name}/
+
+        # 方式一：从 HTML 中取 <a href="/curator/{id}-...">显示名</a>
+        # 注意同一个 href 可能对应多个 a 标签（响应式菜单），找第一个有文字的
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for a in soup.find_all("a", href=re.compile(rf"/curator/{curator_id}-")):
+            text = a.get_text(strip=True)
+            if text:
+                _CURATOR_NAME_CACHE = text
+                logger.info("鉴赏家名字自动探测（HTML）: %s", text)
+                return text
+
+        # 方式二：从重定向 URL 提取
         m = re.search(r"/curator/\d+-(.+?)(?:/|$)", resp.url)
         if m:
             name = unquote(m.group(1))
             _CURATOR_NAME_CACHE = name
-            logger.info("鉴赏家名字自动探测: %s", name)
+            logger.info("鉴赏家名字自动探测（URL）: %s", name)
             return name
     except Exception as e:
         logger.warning("鉴赏家名字自动探测失败: %s", e)
