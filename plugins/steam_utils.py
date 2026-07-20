@@ -76,12 +76,22 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
 
     try:
         # 第一次请求：带 STEAM_CC（如果有的话）
-        details = _fetch_app_data(appid, STEAM_CC)
+        details = None
+        if STEAM_CC:
+            try:
+                details = _fetch_app_data(appid, STEAM_CC)
+            except Exception:
+                log_error("steam_utils.get_game_info",
+                           f"STEAM_CC={STEAM_CC} 请求异常 (AppID: {appid})，降级到默认区域")
 
-        # 如果带 cc 失败（锁区），且 STEAM_CC 有值，降级重试（静默，不污染 errors）
+        # 如果带 cc 失败（网络异常或锁区），且 STEAM_CC 有值，降级重试
         if details is None and STEAM_CC:
             log_error("steam_utils.get_game_info",
                        f"STEAM_CC={STEAM_CC} 目标区不可用 (AppID: {appid})，降级到默认区域")
+            details = _fetch_app_data(appid)
+
+        # STEAM_CC 未设置，直接请求（不带 cc）
+        if details is None and not STEAM_CC:
             details = _fetch_app_data(appid)
 
         if details is not None:
