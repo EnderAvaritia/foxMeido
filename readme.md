@@ -225,7 +225,11 @@ CURATOR_ID=你的鉴赏家ID
 | `GIT_AUTO_PULL_REMOTE` | `origin` | 远程仓库名或 URL（如 `origin` 或 `https://github.com/user/repo.git`） |
 | `GIT_AUTO_PULL_GIT_PATH` | `git` | git 可执行文件路径（绝对路径或仅文件名） |
 | `GIT_AUTO_PULL_RESTART_CMD` | — | 自定义重启命令（如 `systemctl restart foxmeido`；不设则用 `os.execv` 原地替换） |
-| `GIT_AUTO_PULL_BRANCH` | — | 目标分支（留空自动检测当前分支）
+ | `GIT_AUTO_PULL_BRANCH` | — | 目标分支（留空自动检测当前分支）
+
+## Steam Store API 参考
+
+Steam 非官方 API `store.steampowered.com/api/appdetails` 的参数说明、返回格式、注意事项和常用货币对照表 → [`scripts/steam_store_api.md`](scripts/steam_store_api.md)
 
 ## 命令
 
