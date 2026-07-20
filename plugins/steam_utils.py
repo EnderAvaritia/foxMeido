@@ -94,18 +94,10 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
             publishers = details.get("publishers")
             if publishers:
                 publisher = ", ".join(publishers)
-            else:
-                errors.append(
-                    f"API返回的厂商列表为空 (AppID: {appid})"
-                )
 
             rd = details.get("release_date")
             if rd and rd.get("date"):
                 release_date = rd["date"]
-            else:
-                errors.append(
-                    f"API返回的发行日期为空 (AppID: {appid})"
-                )
 
             # 支持语言
             raw_lang = details.get("supported_languages")
@@ -113,19 +105,11 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
                 supported_languages = re.sub(
                     "<.*?>", "", raw_lang
                 ).replace("*", "").replace("具有完全音频支持的语言", "")
-            else:
-                errors.append(
-                    f"API返回的支持语言为空 (AppID: {appid})"
-                )
 
             # 类型（genres）
             raw_genres = details.get("genres")
             if raw_genres:
                 genres = ", ".join(g.get("description", "") for g in raw_genres)
-            else:
-                errors.append(
-                    f"API返回的类型列表为空 (AppID: {appid})"
-                )
 
             # 价格信息
             try:
@@ -139,8 +123,7 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
                     final = 1
                     currency = None
             except Exception as e:
-                errors.append(f"解析价格异常 (AppID: {appid}): {e}")
-                log_error("steam_utils.get_game_info", f"价格异常: {e}")
+                log_error("steam_utils.get_game_info", f"价格异常 (AppID: {appid}): {e}")
                 initial = 1
                 final = 1
                 currency = None
