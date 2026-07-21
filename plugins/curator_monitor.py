@@ -580,7 +580,7 @@ def format_result(result: CheckResult, curator_name: str) -> str:
 
     if not result.new_games and not result.updated_games and not result.today_games:
         lines.append(f"✅ {curator_name} 无新增待处理副本")
-    elif result.new_games or result.updated_games:
+    else:
         lines.append(f"💡 共 {result.total_pending} 款游戏待处理")
 
     return "\n".join(lines)
