@@ -208,7 +208,7 @@ def _init_db() -> None:
         # 兼容旧表：补 first_seen_at 列
         try:
             conn.execute("ALTER TABLE seen_games ADD COLUMN first_seen_at TEXT")
-            conn.execute("UPDATE seen_games SET first_seen_at = updated_at WHERE first_seen_at IS NULL")
+            conn.execute("UPDATE seen_games SET first_seen_at = '2000-01-01 00:00:00' WHERE first_seen_at IS NULL")
         except sqlite3.OperationalError:
             pass  # 列已存在
         conn.commit()
@@ -469,10 +469,9 @@ async def run_check() -> CheckResult:
     save_seen_games(result.games)
     total_in_db = len(load_seen_games())
 
-    # 有新增时，收集今天所有新到游戏（使用当前拉取的副本数量）
-    if result.new_games:
-        today_ids = load_today_ids()
-        result.today_games = [g for g in result.games if g.app_id in today_ids]
+    # 收集今天所有新到游戏（使用当前拉取的副本数量）
+    today_ids = load_today_ids()
+    result.today_games = [g for g in result.games if g.app_id in today_ids]
 
     # 可选 ntfy 推送
     if result.new_games or result.updated_games:
@@ -566,12 +565,12 @@ def format_result(result: CheckResult, curator_name: str) -> str:
             lines.append(f"  🆕 {g.name}（{g.copies} 个副本）")
         lines.append("")
 
-        # 今天所有新到游戏（含本次新增，使用当前副本数）
-        if result.today_games:
-            lines.append(f"📋 {curator_name} 今日新到游戏：")
-            for g in result.today_games:
-                lines.append(f"  📅 {g.name}（{g.copies} 个副本）")
-            lines.append("")
+    # 今日新到游戏（含本次新增，使用当前副本数）
+    if result.today_games:
+        lines.append(f"📋 {curator_name} 今日新到游戏：")
+        for g in result.today_games:
+            lines.append(f"  📅 {g.name}（{g.copies} 个副本）")
+        lines.append("")
 
     if result.updated_games:
         lines.append(f"🔄 {curator_name} 副本数更新：")
@@ -579,9 +578,9 @@ def format_result(result: CheckResult, curator_name: str) -> str:
             lines.append(f"  🔄 {g.name}（{g.copies} 个副本）")
         lines.append("")
 
-    if not result.new_games and not result.updated_games:
+    if not result.new_games and not result.updated_games and not result.today_games:
         lines.append(f"✅ {curator_name} 无新增待处理副本")
-    else:
+    elif result.new_games or result.updated_games:
         lines.append(f"💡 共 {result.total_pending} 款游戏待处理")
 
     return "\n".join(lines)
@@ -690,8 +689,8 @@ async def scheduled_check():
     logger.info("定时检查：开始执行")
     try:
         result = await run_check()
-        if not result.new_games and not result.updated_games:
-            logger.info("无变化，跳过推送")
+        if not result.new_games and not result.updated_games and not result.today_games:
+            logger.info("无变化且无今日新到游戏，跳过推送")
             return
         msg = format_result(result, cfg["curator_name"])
         if notify_group:
