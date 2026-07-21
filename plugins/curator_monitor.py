@@ -75,6 +75,7 @@ class CheckResult:
     games: list[PendingGame]
     new_games: list[PendingGame]
     updated_games: list[PendingGame]
+    today_games: list[PendingGame] | None = None
     error: str | None = None
 
 
@@ -200,9 +201,16 @@ def _init_db() -> None:
                 app_id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 copies INTEGER NOT NULL DEFAULT 1,
-                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                first_seen_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             )
         """)
+        # 兼容旧表：补 first_seen_at 列
+        try:
+            conn.execute("ALTER TABLE seen_games ADD COLUMN first_seen_at TEXT")
+            conn.execute("UPDATE seen_games SET first_seen_at = updated_at WHERE first_seen_at IS NULL")
+        except sqlite3.OperationalError:
+            pass  # 列已存在
         conn.commit()
     finally:
         conn.close()
@@ -218,20 +226,34 @@ def load_seen_games() -> dict[str, dict[str, Any]]:
         conn.close()
 
 
+def load_today_ids() -> set[str]:
+    """从 SQLite 加载今天首次入库的游戏 app_id 集合。"""
+    conn = _get_db()
+    try:
+        today = datetime.now(CST).strftime("%Y-%m-%d")
+        rows = conn.execute(
+            "SELECT app_id FROM seen_games WHERE date(first_seen_at) = ?",
+            (today,),
+        ).fetchall()
+        return {r[0] for r in rows}
+    finally:
+        conn.close()
+
+
 def save_seen_games(games: list[PendingGame]) -> None:
-    """将当前游戏列表写入 SQLite（UPSERT）。"""
+    """将当前游戏列表写入 SQLite。首次入库记录 first_seen_at，后续仅更新名称和副本数。"""
     conn = _get_db()
     try:
         now = datetime.now(CST).strftime("%Y-%m-%d %H:%M:%S")
         for g in games:
             conn.execute("""
-                INSERT INTO seen_games (app_id, name, copies, updated_at)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO seen_games (app_id, name, copies, first_seen_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(app_id) DO UPDATE SET
                     name=excluded.name,
                     copies=excluded.copies,
                     updated_at=excluded.updated_at
-            """, (g.app_id, g.name, g.copies, now))
+            """, (g.app_id, g.name, g.copies, now, now))
         conn.commit()
     finally:
         conn.close()
@@ -447,6 +469,11 @@ async def run_check() -> CheckResult:
     save_seen_games(result.games)
     total_in_db = len(load_seen_games())
 
+    # 有新增时，收集今天所有新到游戏（使用当前拉取的副本数量）
+    if result.new_games:
+        today_ids = load_today_ids()
+        result.today_games = [g for g in result.games if g.app_id in today_ids]
+
     # 可选 ntfy 推送
     if result.new_games or result.updated_games:
         maybe_ntfy(result, cfg["curator_name"])
@@ -538,6 +565,13 @@ def format_result(result: CheckResult, curator_name: str) -> str:
         for g in result.new_games:
             lines.append(f"  🆕 {g.name}（{g.copies} 个副本）")
         lines.append("")
+
+        # 今天所有新到游戏（含本次新增，使用当前副本数）
+        if result.today_games:
+            lines.append(f"📋 {curator_name} 今日新到游戏：")
+            for g in result.today_games:
+                lines.append(f"  📅 {g.name}（{g.copies} 个副本）")
+            lines.append("")
 
     if result.updated_games:
         lines.append(f"🔄 {curator_name} 副本数更新：")
