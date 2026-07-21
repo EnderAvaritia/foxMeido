@@ -145,8 +145,21 @@ CURATOR_ID=你的鉴赏家ID
 
 | 命令 | 说明 |
 |------|------|
-| `pending` | 手动触发一次检查，结果发送到当前群 |
+| `pending` | 手动触发一次检查，结果发送到当前群。有今日新到游戏时额外输出 `📋 今日新到游戏` 列表 |
 | `pending test` | 发送测试推送（QQ 消息 + ntfy 如有配置） |
+
+**消息格式：**
+
+```
+📦 鉴赏家名 新增待处理副本：        ← 本次新增的游戏
+  🆕 游戏A（1 个副本）
+
+📋 鉴赏家名 今日新到游戏：           ← 今天所有新到游戏（含本次新增）
+  📅 游戏A（1 个副本）
+  📅 游戏B（2 个副本）
+
+💡 共 5 款游戏待处理
+```
 
 **日志输出：**
 
@@ -166,6 +179,16 @@ CURATOR_ID=你的鉴赏家ID
 鉴赏家检查完成: 待处理 0, 游戏 0 款, 新增 0, 累计 7
 探测结果为空                     ← Cookie 过期或页面抓取失败
 ```
+
+**数据库修复：**
+
+如果因版本升级导致 `📋 今日新到` 显示了所有历史游戏（而非仅当天），执行：
+
+```bash
+python scripts/fix_curator_db.py
+```
+
+这会重置 `first_seen_at` 错误记录，仅保留真正当天入库的游戏。
 
 `累计` 为 SQLite 中累积的唯一游戏总数（不会回缩）。
 
@@ -262,7 +285,9 @@ foxMeido/
 ├── .env.example          # 配置模板
 ├── pyproject.toml        # NoneBot 项目配置
 ├── scripts/              # 工具脚本
-│   └── get_steam_cookies.py  # 获取 Playwright 格式的 Steam cookie
+│   ├── get_steam_cookies.py    # 获取 Playwright 格式的 Steam cookie
+│   ├── get_curator_cookies.py  # 获取鉴赏家后台 Playwright cookie
+│   └── fix_curator_db.py       # 修复 curator 数据库 first_seen_at 记录
 ├── data/                 # 运行时数据（gitignore）
 │   ├── cookies/          #   Playwright cookie 文件
 │   │   └── steam_playwright.json.example  #   cookie 格式模板
