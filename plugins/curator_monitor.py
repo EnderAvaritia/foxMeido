@@ -15,7 +15,8 @@ Steam 鉴赏家待处理副本监控 - NoneBot2 插件
   CURATOR_ENABLED       — 是否启用每日定时检查（默认 false）
   CURATOR_NOTIFY_GROUP   — 每日定时推送的目标群号（可选）
   CURATOR_NOTIFY_USER    — 每日定时推送的目标 QQ 号（可选，与 GROUP 可同时设置）
-  CURATOR_CHECK_TIME     — 每日定时检查时间，格式 HH:MM（默认 09:00）
+  CURATOR_CHECK_TIME     — 每日定时检查时间，格式 HH:MM（默认 09:00），
+                         多个时间用逗号分隔，如 "09:00,15:00,21:00"
   CURATOR_NTFY_TOPIC     — ntfy topic（可选，设了则额外推送到 ntfy）
 """
 
@@ -664,12 +665,21 @@ async def handle_curator(bot, event):
 
 
 # ── 定时任务：每日推送 ────────────────────────────────────────────
-def _parse_check_time(time_str: str) -> tuple[int, int]:
-    """解析 'HH:MM' 格式的时间字符串。"""
-    parts = time_str.strip().split(":")
-    hour = int(parts[0])
-    minute = int(parts[1]) if len(parts) > 1 else 0
-    return hour, minute
+def _parse_check_time(time_str: str) -> list[tuple[int, int]]:
+    """
+    解析 'HH:MM' 或 'HH:MM,HH:MM' 格式的时间字符串。
+    返回 [(hour, minute), ...] 列表。
+    """
+    result: list[tuple[int, int]] = []
+    for part in time_str.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        segments = part.split(":")
+        hour = int(segments[0])
+        minute = int(segments[1]) if len(segments) > 1 else 0
+        result.append((hour, minute))
+    return result or [(9, 0)]
 
 
 async def scheduled_check():
@@ -712,16 +722,19 @@ _init_db()
 # 注册定时任务（仅在启用时）
 _cfg = get_config()
 if _cfg["enabled"]:
-    _hour, _minute = _parse_check_time(_cfg["check_time"])
-    scheduler.add_job(
-        scheduled_check,
-        "cron",
-        hour=_hour,
-        minute=_minute,
-        id="curator_daily_check",
-        replace_existing=True,
-        misfire_grace_time=300,
-    )
-    logger.info(f"鉴赏家监控已注册，定时检查时间: {_cfg['check_time']}")
+    check_times = _parse_check_time(_cfg["check_time"])
+    for hour, minute in check_times:
+        job_id = f"curator_daily_check_{hour:02d}_{minute:02d}"
+        scheduler.add_job(
+            scheduled_check,
+            "cron",
+            hour=hour,
+            minute=minute,
+            id=job_id,
+            replace_existing=True,
+            misfire_grace_time=300,
+        )
+    time_str = ", ".join(f"{h:02d}:{m:02d}" for h, m in check_times)
+    logger.info(f"鉴赏家监控已注册，定时检查时间: {time_str}")
 else:
     logger.info("鉴赏家监控未启用（CURATOR_ENABLED=false），仅支持手动 pending 命令")
