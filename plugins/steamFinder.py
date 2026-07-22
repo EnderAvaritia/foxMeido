@@ -10,14 +10,13 @@ try:
 except ImportError:
     from nonebot.adapters.onebot.v11 import MessageSegment
 from nonebot.params import CommandArg
-from nonebot.rule import to_me
 
 from plugins.playwright_utils import take_app_screenshot
 from plugins.message_reaction import reaction_cleanup
 from plugins.steam_utils import get_game_info, get_popular_tags
 
 
-steamGoods = on_command("steamGoods", rule=to_me(), aliases={"steam", "查商店", "id"}, priority=10, block=True)
+steamGoods = on_command("steamGoods", aliases={"steam", "查商店", "id"}, priority=10, block=True)
 
 
 @steamGoods.handle()
