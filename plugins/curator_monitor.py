@@ -563,20 +563,20 @@ def format_result(result: CheckResult, curator_name: str) -> str:
     if result.new_games:
         lines.append(f"📦 {curator_name} 新增待处理副本：")
         for g in result.new_games:
-            lines.append(f"  🆕 {g.name}（{g.copies} 个副本）")
+            lines.append(f"  🆕 {g.name}（{g.app_id}）（{g.copies} 个副本）")
         lines.append("")
 
     # 今日新到游戏（含本次新增，使用当前副本数）
     if result.today_games:
         lines.append(f"📋 {curator_name} 今日新到游戏：")
         for g in result.today_games:
-            lines.append(f"  📅 {g.name}（{g.copies} 个副本）")
+            lines.append(f"  📅 {g.name}（{g.app_id}）（{g.copies} 个副本）")
         lines.append("")
 
     if result.updated_games:
         lines.append(f"🔄 {curator_name} 副本数更新：")
         for g in result.updated_games:
-            lines.append(f"  🔄 {g.name}（{g.copies} 个副本）")
+            lines.append(f"  🔄 {g.name}（{g.app_id}）（{g.copies} 个副本）")
         lines.append("")
 
     if not result.new_games and not result.updated_games and not result.today_games:
