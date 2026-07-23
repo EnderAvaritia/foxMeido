@@ -42,6 +42,7 @@ def _fetch_app_data(appid: int | str, cc: str = "") -> dict[str, Any] | None:
         request_kwargs["proxies"] = proxy_cfg
         request_kwargs["verify"] = False
     response = requests.get(api_url, **request_kwargs)
+    print(f"[Steam API] {api_url}")
     response.raise_for_status()
     data = response.json()
     app_data = data.get(str(appid))
