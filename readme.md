@@ -287,7 +287,8 @@ foxMeido/
 ├── scripts/              # 工具脚本
 │   ├── get_steam_cookies.py    # 获取 Playwright 格式的 Steam cookie
 │   ├── get_curator_cookies.py  # 获取鉴赏家后台 Playwright cookie
-│   └── fix_curator_db.py       # 修复 curator 数据库 first_seen_at 记录
+│   ├── fix_curator_db.py       # 修复 curator 数据库 first_seen_at 记录
+│   └── steam_reviews.py        # 提取 Steam 用户评测中的鉴赏家链接
 ├── data/                 # 运行时数据（gitignore）
 │   ├── cookies/          #   Playwright cookie 文件
 │   │   └── steam_playwright.json.example  #   cookie 格式模板
@@ -317,3 +318,8 @@ foxMeido/
         ├── bind.py / get.py / wish.py / ...
         └── README.md            # NocoDB 子模块文档
 ```
+
+## TODO
+
+- wish功能每隔一段时间自动探测游戏何时发售
+- 获取领取记录，用于核对
