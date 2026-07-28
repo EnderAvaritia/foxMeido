@@ -38,7 +38,8 @@ from nonebot.plugin import on_command
 from nonebot.log import logger
 from nonebot.exception import FinishedException
 
-from plugins.noco.noco_config import get_proxies
+from plugins.noco.noco_config import get_proxies, table_url, REMAIN_TABLE_ID
+from plugins.noco import noco_utils
 from plugins.message_reaction import reaction_cleanup
 from plugins.playwright_utils import ensure_browser, create_context
 
@@ -260,6 +261,27 @@ def save_seen_games(games: list[PendingGame]) -> None:
         conn.close()
 
 
+def sync_to_remain(new_games: list[PendingGame]) -> None:
+    """将新增的游戏同步到 NocoDB remain 表。"""
+    if not REMAIN_TABLE_ID:
+        logger.info("NOCO_REMAIN_TABLE 未配置，跳过 NocoDB 同步")
+        return
+    url = table_url(REMAIN_TABLE_ID)
+    for g in new_games:
+        payload = {
+            "gameId": int(g.app_id),
+            "gameName": g.name,
+            "totalCount": g.copies,
+            "getedCount": 0,
+            "canBeClaimed": g.copies,
+        }
+        result = noco_utils.create_record(url, payload)
+        if "error" not in result:
+            logger.info("remain 同步成功: %s (appid=%s, copies=%d)", g.name, g.app_id, g.copies)
+        else:
+            logger.warning("remain 同步失败: %s - %s", g.name, result["error"])
+
+
 # ── 中文数字解析 ────────────────────────────────────────────────
 _CHINESE_DIGITS = {
     "零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4,
@@ -469,6 +491,10 @@ async def run_check() -> CheckResult:
     # 更新 SQLite 状态，然后读取入库总数
     save_seen_games(result.games)
     total_in_db = len(load_seen_games())
+
+    # 新游戏同步到 NocoDB remain 表
+    if result.new_games:
+        sync_to_remain(result.new_games)
 
     # 收集今天所有新到游戏（使用当前拉取的副本数量）
     today_ids = load_today_ids()
