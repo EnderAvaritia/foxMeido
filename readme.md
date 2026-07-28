@@ -295,7 +295,8 @@ foxMeido/
 │   └── db/               #   SQLite 数据库文件
 ├── logs/                 # 错误日志（自动创建，gitignore）
 └── plugins/
-    ├── steam_utils.py    # Steam 通用工具
+    ├── env_utils.py        # 环境变量读取、代理配置（通用工具）
+    ├── steam_utils.py      # Steam 通用工具
     ├── cs.py             # CS2 挂刀行情
     ├── curator_monitor.py# Steam 鉴赏家副本监控
     ├── dota.py           # Dota2 挂刀行情
