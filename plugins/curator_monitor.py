@@ -148,6 +148,7 @@ def get_config() -> dict[str, Any]:
     check_time = _read_dotenv("CURATOR_CHECK_TIME") or "09:00"
     ntfy_topic = _read_dotenv("CURATOR_NTFY_TOPIC")
     enabled = _read_dotenv("CURATOR_ENABLED") in ("true", "1", "yes")
+    sync_remain = _read_dotenv("CURATOR_SYNC_REMAIN") in ("true", "1", "yes")
 
     return {
         "cookie": cookie,
@@ -159,6 +160,7 @@ def get_config() -> dict[str, Any]:
         "check_time": check_time,
         "ntfy_topic": ntfy_topic,
         "enabled": enabled,
+        "sync_remain": sync_remain,
     }
 
 
@@ -493,7 +495,7 @@ async def run_check() -> CheckResult:
     total_in_db = len(load_seen_games())
 
     # 新游戏同步到 NocoDB remain 表
-    if result.new_games:
+    if result.new_games and cfg.get("sync_remain"):
         sync_to_remain(result.new_games)
 
     # 收集今天所有新到游戏（使用当前拉取的副本数量）
