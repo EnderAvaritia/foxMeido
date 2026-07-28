@@ -270,7 +270,7 @@ def fetch_page(
     full_url = f"{url}?{PAGE_PARAM}={page}"
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            resp = session.get(full_url, timeout=30)
+            resp = session.get(full_url, timeout=(10, 20))
             resp.raise_for_status()
             # 检查是否返回了有效的 Steam 页面（不是空/重定向）
             content = resp.text
@@ -560,59 +560,66 @@ def process_user(
     print(f"════════════════════════════════════════════")
 
     while not stop_pagination:
-        print(f"  [PAGE] 第 {page} 页...", file=sys.stderr)
+        try:
+            print(f"  [PAGE] 第 {page} 页...", file=sys.stderr)
 
-        html = fetch_page(session, url, page)
-        if html is None:
-            print(f"  [DONE] 第 {page} 页无数据", file=sys.stderr)
-            break
+            html = fetch_page(session, url, page)
+            if html is None:
+                print(f"  [DONE] 第 {page} 页无数据", file=sys.stderr)
+                break
 
-        curator_reviews = parse_reviews_from_html(html)
-        all_dates = _extract_all_dates(html)
+            curator_reviews = parse_reviews_from_html(html)
+            all_dates = _extract_all_dates(html)
 
-        if not all_dates and not curator_reviews:
-            print(f"  [DONE] 第 {page} 页无任何评测", file=sys.stderr)
-            break
+            if not all_dates and not curator_reviews:
+                print(f"  [DONE] 第 {page} 页无任何评测", file=sys.stderr)
+                break
 
-        # 日期终止判定
-        if since and all_dates:
-            max_date = max(all_dates)
-            if max_date < since:
-                print(
-                    f"  [DONE] 最新评测 {max_date} 早于 {since}，停止",
-                    file=sys.stderr,
-                )
-                stop_pagination = True
+            # 日期终止判定
+            if since and all_dates:
+                max_date = max(all_dates)
+                if max_date < since:
+                    print(
+                        f"  [DONE] 最新评测 {max_date} 早于 {since}，停止",
+                        file=sys.stderr,
+                    )
+                    stop_pagination = True
 
-        for rev in curator_reviews:
-            rev_date = rev["date"]
-            if rev_date:
-                if since and rev_date < since:
-                    continue
-                if until and rev_date > until:
-                    continue
+            for rev in curator_reviews:
+                rev_date = rev["date"]
+                if rev_date:
+                    if since and rev_date < since:
+                        continue
+                    if until and rev_date > until:
+                        continue
 
-            for curator_url, curator_name in rev["curators"]:
-                row = {
-                    "游戏名": rev["game_name"],
-                    "App ID": rev["app_id"] or "",
-                    "评测时间": rev_date.isoformat() if rev_date else "",
-                    "评测链接": rev["review_url"],
-                    "鉴赏家链接": curator_url,
-                    "鉴赏家名称": curator_name,
-                }
-                writer.writerow(row)
-                csv_file.flush()
-                total_rows += 1
-                print(
-                    f"  [{rev['game_name']}]({rev['app_id'] or '?'}) {rev_date or 'N/A'} "
-                    f"→ {curator_name} ({curator_url})"
-                )
+                for curator_url, curator_name in rev["curators"]:
+                    row = {
+                        "游戏名": rev["game_name"],
+                        "App ID": rev["app_id"] or "",
+                        "评测时间": rev_date.isoformat() if rev_date else "",
+                        "评测链接": rev["review_url"],
+                        "鉴赏家链接": curator_url,
+                        "鉴赏家名称": curator_name,
+                    }
+                    writer.writerow(row)
+                    csv_file.flush()
+                    total_rows += 1
+                    print(
+                        f"  [{rev['game_name']}]({rev['app_id'] or '?'}) {rev_date or 'N/A'} "
+                        f"→ {curator_name} ({curator_url})"
+                    )
 
-        if not stop_pagination:
-            page += 1
-            delay = random.uniform(*REQUEST_DELAY)
-            time.sleep(delay)
+            if not stop_pagination:
+                page += 1
+                delay = random.uniform(*REQUEST_DELAY)
+                time.sleep(delay)
+        except KeyboardInterrupt:
+            print(
+                f"\n  [EXIT] 用户中断，已处理 {total_rows} 条记录",
+                file=sys.stderr,
+            )
+            raise
 
     print(f"  [DONE] {id_part}: 共 {total_rows} 条")
     return total_rows
@@ -657,10 +664,18 @@ def run() -> None:
     print(f"[INFO] 输出文件: {csv_name}")
 
     grand_total = 0
-    for steam_input in inputs:
-        grand_total += process_user(session, writer, csv_file, steam_input, since, until)
-
-    csv_file.close()
+    try:
+        for steam_input in inputs:
+            grand_total += process_user(session, writer, csv_file, steam_input, since, until)
+    except KeyboardInterrupt:
+        print(file=sys.stderr)
+        print(
+            f"[EXIT] 用户中断，已保存至 {csv_name}（共 {grand_total} 条）",
+            file=sys.stderr,
+        )
+        sys.exit(0)
+    finally:
+        csv_file.close()
     print()
     print(f"[DONE] 全部完成，共 {grand_total} 条记录，已保存至 {csv_name}")
 
