@@ -38,7 +38,8 @@ from nonebot.plugin import on_command
 from nonebot.log import logger
 from nonebot.exception import FinishedException
 
-from plugins.noco.noco_config import get_proxies, table_url, REMAIN_TABLE_ID
+from plugins.noco.noco_config import table_url, REMAIN_TABLE_ID
+from plugins.env_utils import get_proxies
 from plugins.noco import noco_utils
 from plugins.message_reaction import reaction_cleanup
 from plugins.playwright_utils import ensure_browser, create_context
@@ -86,9 +87,9 @@ _CURATOR_NAME_CACHE: str | None = None
 
 
 def _read_dotenv(key: str) -> str:
-    """从 os.environ 或 .env 文件读配置（使用 noco_config 的读取方式）。"""
-    from plugins.noco.noco_config import _read_dotenv as _noco_read
-    return _noco_read(key)
+    """从 os.environ 或 .env 文件读配置（使用 env_utils 的读取方式）。"""
+    from plugins.env_utils import _read_dotenv as _env_read
+    return _env_read(key)
 
 
 def _resolve_curator_name(curator_id: str) -> str:

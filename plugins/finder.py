@@ -13,7 +13,7 @@ import requests
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
-from plugins.noco.noco_config import get_proxies, get_http_proxy
+from plugins.env_utils import get_proxies, get_http_proxy
 from plugins.playwright_utils import get_headless, _save_failure_screenshot
 from plugins.error_logger import log_error
 from plugins.message_reaction import reaction_cleanup

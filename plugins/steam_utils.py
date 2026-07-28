@@ -19,7 +19,8 @@ import requests
 
 from bs4 import BeautifulSoup
 
-from plugins.noco.noco_config import get_proxies, STEAM_COOKIE, STEAM_CC
+from plugins.env_utils import get_proxies
+from plugins.noco.noco_config import STEAM_COOKIE, STEAM_CC
 from plugins.error_logger import log_error
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
