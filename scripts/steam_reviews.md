@@ -67,4 +67,4 @@ python steam_reviews.py --list users.txt --since 2026-01-01 --cookie "..." --pro
 
 自动生成 CSV，文件名格式：`{steam_id}_{起始日期}_{结束日期}.csv`
 
-每条记录包含：游戏名、App ID、评测时间、评测链接、鉴赏家链接、鉴赏家名称
+每条记录包含：游戏名、App ID、评测时间、评测链接、鉴赏家链接、鉴赏家名称、组评
