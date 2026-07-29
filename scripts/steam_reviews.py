@@ -531,7 +531,7 @@ def _extract_curator_links(card) -> list[tuple[str, str]]:
 
 # ── 主流程 ──────────────────────────────────────────────────────────────
 
-CSV_FIELDS = ["游戏名", "App ID", "评测时间", "评测链接", "鉴赏家链接", "鉴赏家名称"]
+CSV_FIELDS = ["游戏名", "App ID", "评测时间", "评测链接", "鉴赏家链接", "鉴赏家名称", "组评"]
 
 
 def process_user(
@@ -594,6 +594,14 @@ def process_user(
                         continue
 
                 for curator_url, curator_name in rev["curators"]:
+                    # 从鉴赏家链接提取 curatorid
+                    cid_m = re.search(r"/curator/(\d+)", curator_url)
+                    curator_id = cid_m.group(1) if cid_m else ""
+                    group_review_url = (
+                        f"https://store.steampowered.com/app/{rev['app_id']}/_/"
+                        f"?curator_clanid={curator_id}"
+                        if rev["app_id"] and curator_id else ""
+                    )
                     row = {
                         "游戏名": rev["game_name"],
                         "App ID": rev["app_id"] or "",
@@ -601,6 +609,7 @@ def process_user(
                         "评测链接": rev["review_url"],
                         "鉴赏家链接": curator_url,
                         "鉴赏家名称": curator_name,
+                        "组评": group_review_url,
                     }
                     writer.writerow(row)
                     csv_file.flush()
