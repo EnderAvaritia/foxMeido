@@ -48,19 +48,20 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
         if cleanup: await cleanup()
         await get.finish(f"游戏{goodId}数据获取出错，请反馈")
 
-    # 检查游戏剩余数量
-    remainUrl = cfg.url_with_filter(cfg.REMAIN_TABLE_ID, f"(gameId,eq,{goodId})")
-    remainGameRecord = utils.get_record(remainUrl)
-    if "id" not in remainGameRecord:
-        if cleanup: await cleanup()
-        await get.finish(
-            f'id为{goodId}的游戏\n《{gameInfo["game_name"]}》尚未收录\n请联系厂商'
-        )
-    elif remainGameRecord["getedCount"] >= remainGameRecord["totalCount"]:
-        if cleanup: await cleanup()
-        await get.finish(
-            f'id为{goodId}的游戏\n《{gameInfo["game_name"]}》已领取完毕\n无剩余'
-        )
+    # 检查游戏剩余数量（可由 NOCO_CHECK_REMAIN 环境变量关闭）
+    if cfg.CHECK_REMAIN:
+        remainUrl = cfg.url_with_filter(cfg.REMAIN_TABLE_ID, f"(gameId,eq,{goodId})")
+        remainGameRecord = utils.get_record(remainUrl)
+        if "id" not in remainGameRecord:
+            if cleanup: await cleanup()
+            await get.finish(
+                f'id为{goodId}的游戏\n《{gameInfo["game_name"]}》尚未收录\n请联系厂商'
+            )
+        elif remainGameRecord["getedCount"] >= remainGameRecord["totalCount"]:
+            if cleanup: await cleanup()
+            await get.finish(
+                f'id为{goodId}的游戏\n《{gameInfo["game_name"]}》已领取完毕\n无剩余'
+            )
 
     # 检查账号绑定
     accountUrl = cfg.url_with_filter(cfg.ACCOUNT_TABLE_ID, f"(account,eq,{userId})")
@@ -103,22 +104,30 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
         if cleanup: await cleanup()
         await get.finish(f"登记阶段出现未知错误，请反馈")
 
-    # 更新 remain 表格
-    canBeClaimed = remainGameRecord["totalCount"] - remainGameRecord["getedCount"] - 1
-    remainPayload = {
-        "id": remainGameRecord["id"],
-        "gameId": goodId,
-        "gameName": gameInfo["game_name"],
-        "totalCount": remainGameRecord["totalCount"],
-        "getedCount": remainGameRecord["getedCount"] + 1,
-        "canBeClaimed": canBeClaimed,
-    }
-    remain = utils.update_record(cfg.table_url(cfg.REMAIN_TABLE_ID), remainPayload)
-    if "id" in remain:
+    # 更新 remain 表格（可由 NOCO_CHECK_REMAIN 环境变量关闭）
+    if cfg.CHECK_REMAIN:
+        canBeClaimed = remainGameRecord["totalCount"] - remainGameRecord["getedCount"] - 1
+        remainPayload = {
+            "id": remainGameRecord["id"],
+            "gameId": goodId,
+            "gameName": gameInfo["game_name"],
+            "totalCount": remainGameRecord["totalCount"],
+            "getedCount": remainGameRecord["getedCount"] + 1,
+            "canBeClaimed": canBeClaimed,
+        }
+        remain = utils.update_record(cfg.table_url(cfg.REMAIN_TABLE_ID), remainPayload)
+        if "id" in remain:
+            if cleanup: await cleanup()
+            await get.finish(
+                f'用户ID {userId} (昵称: {accountRecord["nickname"]})\n'
+                f'对游戏ID {goodId}《{gameInfo["game_name"]}》\n'
+                f'成功登记为第{recordResult["id"]}个结果\n'
+                f'游戏剩余{remainGameRecord["totalCount"] - remainGameRecord["getedCount"] - 1}个'
+            )
+    else:
         if cleanup: await cleanup()
         await get.finish(
             f'用户ID {userId} (昵称: {accountRecord["nickname"]})\n'
             f'对游戏ID {goodId}《{gameInfo["game_name"]}》\n'
-            f'成功登记为第{recordResult["id"]}个结果\n'
-            f'游戏剩余{remainGameRecord["totalCount"] - remainGameRecord["getedCount"] - 1}个'
+            f'成功登记为第{recordResult["id"]}个结果'
         )

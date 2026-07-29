@@ -68,6 +68,7 @@ COMMAND_START=[""]
 | `NOCO_ACCOUNT_TABLE` | — | account 表格 ID |
 | `NOCO_RECORD_TABLE` | — | record 表格 ID |
 | `NOCO_REMAIN_TABLE` | — | remain 表格 ID |
+| `NOCO_CHECK_REMAIN` | `true` | `get` 指令是否检查 remain 表剩余副本数；`false` 时跳过检查直接登记 |
 | `NOCO_WISHLIST_TABLE` | — | wishlist 表格 ID |
 | `NOCO_VERIFY_SSL` | `false` | 是否验证 SSL（国内自建通常用自签名证书，默认关闭） |
 

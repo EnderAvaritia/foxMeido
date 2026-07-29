@@ -50,10 +50,14 @@ RECORD_TABLE_ID: str = _read_dotenv("NOCO_RECORD_TABLE") or ""
 REMAIN_TABLE_ID: str = _read_dotenv("NOCO_REMAIN_TABLE") or ""
 WISHLIST_TABLE_ID: str = _read_dotenv("NOCO_WISHLIST_TABLE") or ""
 
+# ── 功能开关 ────────────────────────────────────────────
+CHECK_REMAIN: bool = _env_bool("NOCO_CHECK_REMAIN", "true")
+
 print(f"[CONFIG] NOCO_URL={NOCO_URL!r}")
 print(f"[CONFIG] ACCOUNT_TABLE_ID={ACCOUNT_TABLE_ID!r}")
 print(f"[CONFIG] RECORD_TABLE_ID={RECORD_TABLE_ID!r}")
 print(f"[CONFIG] REMAIN_TABLE_ID={REMAIN_TABLE_ID!r}")
+print(f"[CONFIG] CHECK_REMAIN={CHECK_REMAIN!r}")
 print(f"[CONFIG] WISHLIST_TABLE_ID={WISHLIST_TABLE_ID!r}")
 
 # ── 请求通用配置 ─────────────────────────────────────────────
