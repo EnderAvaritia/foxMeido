@@ -166,12 +166,11 @@ def fetch_url_with_retry(
     method: str = "GET",
     params: Optional[dict] = None,
     max_retries: int = DEFAULT_MAX_RETRIES,
-    is_initial_list: bool = False,
+    target: str = "游戏页面",
     logger: Optional[logging.Logger] = None,
 ) -> requests.Response:
-    """带重试的请求封装，失败时指数等待后重试。"""
+    """带重试的请求封装，失败时随机等待后重试。"""
     logger = logger or logging.getLogger("steam_curator_views")
-    target = "推荐列表" if is_initial_list else "游戏页面"
     for retries in range(1, max_retries + 1):
         try:
             if method == "GET":
@@ -190,6 +189,36 @@ def fetch_url_with_retry(
                 time.sleep(wait_time)
     logger.error("重试 %d 次后获取%s失败。", max_retries, target)
     raise
+
+
+def fetch_curator_name(
+    clan_id: str,
+    headers: dict,
+    proxies: Optional[dict],
+    logger: logging.Logger,
+) -> Optional[str]:
+    """通过鉴赏家主页获取组名称，返回 None 表示获取失败。"""
+    url = f"https://store.steampowered.com/curator/{clan_id}/"
+    try:
+        response = fetch_url_with_retry(
+            make_session(headers, proxies), url, target="鉴赏家主页", logger=logger,
+        )
+        soup = BeautifulSoup(response.text, "html.parser")
+        name_el = soup.find(class_="curator_name")
+        if name_el:
+            name = name_el.get_text(strip=True)
+            if name:
+                return name
+        # 备用：从 <title> 提取（形如 "Steam Curator: xxx" / "Steam 上的 xxx"）
+        title_tag = soup.find("title")
+        if title_tag:
+            title = title_tag.get_text(strip=True)
+            for prefix in ("Steam Curator: ", "Steam 上的 "):
+                if title.startswith(prefix):
+                    return title[len(prefix):]
+    except requests.exceptions.RequestException:
+        pass
+    return None
 
 
 def visit_app_page(
@@ -236,7 +265,18 @@ def main() -> None:
     headers["Cookie"] = args.cookie
     proxies = {"http": args.proxy, "https": args.proxy} if args.proxy else None
 
-    # 0. 尝试获取登录用户 ID（仅确认登录状态，失败不中断）
+    # 0. 组名称：--name 未传则从鉴赏家主页自动获取
+    if not args.name:
+        logger.info("--------------------------")
+        logger.info("未提供 --name，尝试从鉴赏家主页获取组名称...")
+        fetched_name = fetch_curator_name(args.clan_id, headers, proxies, logger)
+        if fetched_name:
+            args.name = fetched_name
+            logger.info("获取到组名称: %s", fetched_name)
+        else:
+            logger.warning("获取组名称失败，将使用组 ID 代替。")
+
+    # 1. 尝试获取登录用户 ID（仅确认登录状态，失败不中断）
     try:
         logger.info("--------------------------")
         group_name = args.name if args.name else args.clan_id
@@ -256,7 +296,7 @@ def main() -> None:
     except Exception as e:
         logger.warning("解析用户 ID 失败: %s", e)
 
-    # 1. 拉取组评推荐列表
+    # 2. 拉取组评推荐列表
     logger.info("--------------------------")
     logger.info("开始获取鉴赏家推荐列表...")
     curator_url = build_curator_url(args.clan_id, args.name)
@@ -273,7 +313,7 @@ def main() -> None:
     }
     response = fetch_url_with_retry(
         make_session(headers, proxies), curator_url, params=params,
-        is_initial_list=True, logger=logger,
+        target="推荐列表", logger=logger,
     )
     soup = BeautifulSoup(response.text, "html.parser")
     for _ in range(2):
@@ -288,7 +328,7 @@ def main() -> None:
     app_ids = [link["data-ds-appid"].replace('\\"', "") for link in links]
     logger.info("共获取到 %d 条组评。", len(app_ids))
 
-    # 2. 定位起始 App ID
+    # 3. 定位起始 App ID
     start_index = 0
     if args.start_appid:
         try:
@@ -297,7 +337,7 @@ def main() -> None:
         except ValueError:
             logger.warning("未找到指定的 App ID %s，将从头开始执行。", args.start_appid)
 
-    # 3. 并发访问游戏页面以产生浏览量
+    # 4. 并发访问游戏页面以产生浏览量
     total = len(app_ids) - start_index
     logger.info("开始处理 %d 个游戏页面（线程数: %d）...", total, max(1, args.threads))
 
@@ -330,7 +370,7 @@ def main() -> None:
     except KeyboardInterrupt:
         logger.warning("脚本被用户中断。")
 
-    # 4. 汇总
+    # 5. 汇总
     logger.info("--------------------------")
     logger.info("脚本停止。")
     if last_processed[0]:
