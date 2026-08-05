@@ -239,6 +239,8 @@ def main() -> None:
     # 0. 尝试获取登录用户 ID（仅确认登录状态，失败不中断）
     try:
         logger.info("--------------------------")
+        group_name = args.name if args.name else args.clan_id
+        logger.info("当前组名称: %s (组 ID: %s)", group_name, args.clan_id)
         logger.info("尝试获取 Steam 用户 ID...")
         resp = requests.get(STEAM_MAIN_URL, headers=headers, proxies=proxies,
                             timeout=REQUEST_TIMEOUT)
