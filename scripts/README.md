@@ -16,7 +16,7 @@ python steam_curator_views.py --clan-id 45519015 --name "无趣评测" --cookie 
 
 # 带代理 + 并发 + 限制数量 + 保存日志
 python steam_curator_views.py --clan-id 45519015 --name "无趣评测" --cookie "<cookie>" \
-    --proxy http://127.0.0.1:10279 --count 500 --threads 4 --log views.log
+    --proxy http://127.0.0.1:7890 --count 500 --threads 4 --log views.log
 ```
 
 ### 从断点继续
@@ -33,7 +33,7 @@ python steam_curator_views.py --clan-id 45519015 --name "无趣评测" --cookie 
 | `--clan-id` | 是 | 鉴赏家组的 ID（clan ID，纯数字，如 `45519015`） |
 | `--name` | 否 | 鉴赏家组的名称（用于拼接 URL，留空则使用仅 ID 的地址） |
 | `--cookie` | 是 | Steam Cookie 字符串（用于以登录身份访问） |
-| `--proxy` | 否 | 代理地址，如 `http://127.0.0.1:10279` |
+| `--proxy` | 否 | 代理地址，如 `http://127.0.0.1:7890` |
 | `--count` | 否 | 每次拉取的组评数量（默认 `835`） |
 | `--threads` | 否 | 同时执行的线程数（默认 `1`） |
 | `--wait-min` | 否 | 每次访问之间的最小等待秒数（默认 `8`） |
@@ -125,11 +125,84 @@ GET https://store.steampowered.com/api/appdetails
 
 ---
 
+# Steam 评测鉴赏家链接提取
+
+扫描 Steam 用户的评测页面，提取评测内容中包含的鉴赏家（Curator）超链接，输出为 CSV。
+
+## 用法
+
+```bash
+# 安装依赖
+pip install -r requirements.txt
+
+# 基本用法
+python steam_reviews.py EnderAvaritia
+
+# 指定日期范围
+python steam_reviews.py EnderAvaritia --since 2026-05-01 --until 2026-05-31
+
+# 仅起始日期（到今日）
+python steam_reviews.py EnderAvaritia --since 2026-05-01
+
+# 仅结束日期
+python steam_reviews.py EnderAvaritia --until 2025-12-31
+
+# 带 Cookie + 代理
+python steam_reviews.py EnderAvaritia --since 2026-01-01 --cookie "sessionid=xxx" --proxy http://127.0.0.1:7890
+```
+
+## 参数
+
+| 参数 | 说明 |
+|---|---|
+| `steam_id` | Steam 自定义 URL、SteamID64 或完整 URL（如 `https://steamcommunity.com/id/xxx/recommended/`） |
+| `--since` | 起始日期 YYYY-MM-DD，只抓此日期之后的评测 |
+| `--until` | 结束日期 YYYY-MM-DD，只抓此日期之前的评测（含当日） |
+| `--cookie` | Steam Cookie 字符串 |
+| `--cookie-file FILE` | Cookie 文件路径（默认项目目录下的 cookie.txt） |
+| `--proxy` | 代理地址，如 `http://127.0.0.1:7890` |
+| `--list FILE` | 批量模式：文本文件，每行一个 Steam URL/ID |
+
+### 批量模式
+
+准备一个文本文件，每行一个 Steam 用户：
+
+```
+EnderAvaritia
+https://steamcommunity.com/id/2802897529/recommended/
+76561198836530221
+```
+
+```bash
+python steam_reviews.py --list users.txt --since 2026-01-01 --cookie "..." --proxy http://127.0.0.1:7890
+```
+
+所有用户的结果写入同一个 CSV 文件 `batch_YYYY-MM-DD.csv`。
+
+## Cookie 来源（优先级）
+
+1. `--cookie` 命令行参数
+2. `STEAM_COOKIE` 环境变量
+3. `cookie.txt` 文件（项目目录下）
+
+## 代理来源（优先级）
+
+1. `--proxy` 命令行参数
+2. `HTTPS_PROXY` / `HTTP_PROXY` 环境变量
+
+## 输出
+
+自动生成 CSV，文件名格式：`{steam_id}_{起始日期}_{结束日期}.csv`
+
+每条记录包含：游戏名、App ID、评测时间、评测链接、鉴赏家链接、鉴赏家名称、组评
+
+---
+
 ## 同目录其他脚本
 
 | 脚本 | 用途 |
 |------|------|
-| `steam_reviews.py` | 提取 Steam 用户评测中的鉴赏家链接，输出 CSV（详见 `steam_reviews.md`） |
+| `steam_reviews.py` | 提取 Steam 用户评测中的鉴赏家链接，输出 CSV（详见上方章节） |
 | `get_curator_cookies.py` | 通过 Playwright 自动登录并获取鉴赏家后台 Cookie |
 | `get_steam_cookies.py` | 获取 Steam Cookie |
 | `fix_curator_db.py` | 修复鉴赏家数据库 |
