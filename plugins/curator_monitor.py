@@ -617,6 +617,11 @@ def format_result(result: CheckResult, curator_name: str) -> str:
 
 
 # ── 发送消息 ──────────────────────────────────────────────────────
+def _split_ids(raw: str) -> list[str]:
+    """将逗号分隔的 QQ 号/群号字符串拆分为列表（自动去空格、忽略空项）。"""
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
+
 async def send_to_group(group_id: str, message: str) -> None:
     """向指定 QQ 群发送消息。"""
     try:
@@ -732,17 +737,17 @@ async def scheduled_check():
             logger.info("无变化且无今日新到游戏，跳过推送")
             return
         msg = format_result(result, cfg["curator_name"])
-        if notify_group:
-            await send_to_group(notify_group, msg)
-        if notify_user:
-            await send_to_user(notify_user, msg)
+        for group_id in _split_ids(notify_group):
+            await send_to_group(group_id, msg)
+        for user_id in _split_ids(notify_user):
+            await send_to_user(user_id, msg)
     except Exception as e:
         logger.exception(f"定时检查异常: {e}")
         err_msg = f"❌ 鉴赏家副本检查异常: {e}"
-        if notify_group:
-            await send_to_group(notify_group, err_msg)
-        if notify_user:
-            await send_to_user(notify_user, err_msg)
+        for group_id in _split_ids(notify_group):
+            await send_to_group(group_id, err_msg)
+        for user_id in _split_ids(notify_user):
+            await send_to_user(user_id, err_msg)
 
 
 # ── 插件初始化 ────────────────────────────────────────────────────
