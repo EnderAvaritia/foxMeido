@@ -8,6 +8,9 @@ log_error()  → logs/error_<时间戳>.log  （一般错误，如网络超时�
 log_crash()  → logs/crash_<时间戳>.log  （崩溃级错误，含 extra 上下文）
                + 可选 ntfy 推送（通过环境变量 CRASH_NTFY_SERVER / CRASH_NTFY_TOPIC 配置）。
 
+日志文件会自动记录触发错误的指令文本（如 "steamGoods 12345"），
+仅当错误发生在指令/事件处理上下文中时才会写入该行。
+
 用法：
     from plugins.error_logger import log_error, log_crash
 
@@ -122,6 +125,25 @@ def _push_ntfy(source: str, message: str, extra: dict[str, Any] | None) -> None:
         print(f"[ntfy] 推送失败: {e}")
 
 
+def _get_current_command() -> str | None:
+    """
+    获取当前正在执行的指令文本（如 "steamGoods 12345"）。
+
+    通过 NoneBot 的 ``current_event`` 上下文变量读取，仅在事件处理中
+    （指令处理器/定时任务等）有值；脚本独立运行时返回 None。
+    """
+    try:
+        from nonebot.internal.matcher import current_event
+
+        event = current_event.get()
+        text = event.get_plaintext().strip()
+        if text:
+            return text[:200]
+    except Exception:  # noqa: BLE001 - 上下文未设置或解析失败，忽略
+        pass
+    return None
+
+
 def _write_log(
     prefix: str,
     source: str,
@@ -137,6 +159,9 @@ def _write_log(
     lines: list[str] = [
         f"[{timestamp}] [{source}] {message}",
     ]
+    command = _get_current_command()
+    if command:
+        lines.append(f"指令: {command}")
     if exc_info:
         tb = traceback.format_exc().strip()
         if tb:
@@ -168,6 +193,13 @@ def log_error(source: str, message: str, exc_info: bool = True) -> None:
         source: 错误来源，如 ``"steamFinder.take_screenshot"``。
         message: 错误描述文字。
         exc_info: 是否包含异常堆栈（默认 True）。
+
+    日志内容形如::
+
+        [2026-01-01_12-00-00] [steam_utils.get_game_info] 请求API异常: ...
+        指令: steamGoods 12345
+        Traceback:
+          ...
     """
     filepath = _write_log("error", source, message, exc_info, extra=None)
     print(f"[ERROR] [{source}] {message} → {filepath}")
