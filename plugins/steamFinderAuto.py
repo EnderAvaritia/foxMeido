@@ -1,3 +1,4 @@
+import asyncio
 import re
 import base64
 
@@ -66,12 +67,24 @@ async def get_message(goodId):
             # return title + pic
 #旧的实现，已作废
 
-    appid = goodId[0][0] 
-    gameInfo = get_game_info(appid)
+    appid = goodId[0][0]
+    # 并发执行信息请求与截图，总耗时取两者最大值而非串行之和
+    game_info_task = asyncio.create_task(asyncio.to_thread(get_game_info, appid))
+    tags_task = asyncio.create_task(asyncio.to_thread(get_popular_tags, appid))
+    shot_task = asyncio.create_task(take_app_screenshot(appid))
+    gameInfo, tags_result, pic_data = await asyncio.gather(
+        game_info_task, tags_task, shot_task, return_exceptions=True
+    )
+    # to_thread / 截图异常时按缺失数据兜底，避免整个命令崩溃
+    if isinstance(gameInfo, BaseException):
+        gameInfo = {"error": str(gameInfo)}
+    if isinstance(tags_result, BaseException):
+        tags_result = {}
+    if isinstance(pic_data, BaseException):
+        pic_data = None
+
     if "error" in gameInfo:
         await steamGoods.finish(f"游戏{goodId}数据获取出错，请反馈")
-    tags_result = get_popular_tags(appid)
-    pic_data = await take_app_screenshot(appid)
     
     # 格式化价格
     if gameInfo.get("currency"):

@@ -1,3 +1,4 @@
+import asyncio
 import httpx
 import urllib3
 from lxml import html
@@ -142,12 +143,24 @@ async def get_choice(number: int):
         await steam_searcher.finish("无效的链接", at_sender=False)
         return
 
-    # 获取游戏详细信息（与 steamFinderAuto 格式一致）
-    gameInfo = get_game_info(appid)
+    # 并发执行信息请求与截图，总耗时取两者最大值而非串行之和
+    game_info_task = asyncio.create_task(asyncio.to_thread(get_game_info, appid))
+    tags_task = asyncio.create_task(asyncio.to_thread(get_popular_tags, appid))
+    shot_task = asyncio.create_task(take_app_screenshot(appid))
+    gameInfo, tags_result, screenshot_bytes = await asyncio.gather(
+        game_info_task, tags_task, shot_task, return_exceptions=True
+    )
+    # to_thread / 截图异常时按缺失数据兜底，避免整个命令崩溃
+    if isinstance(gameInfo, BaseException):
+        gameInfo = {"error": str(gameInfo)}
+    if isinstance(tags_result, BaseException):
+        tags_result = {}
+    if isinstance(screenshot_bytes, BaseException):
+        screenshot_bytes = None
+
     if "error" in gameInfo:
         if cleanup: await cleanup()
         await steam_searcher.finish(f"游戏{appid}数据获取出错，请反馈", at_sender=False)
-    tags_result = get_popular_tags(appid)
 
     # 格式化价格
     if gameInfo.get("currency"):
@@ -179,7 +192,6 @@ async def get_choice(number: int):
     lines.append(f'Steam商店页链接：https://store.steampowered.com/app/{appid}')
     info_text = '\n'.join(lines)
 
-    screenshot_bytes = await take_app_screenshot(appid)
     if screenshot_bytes:
         pic = UniMessage.image(raw=screenshot_bytes)
         if cleanup: await cleanup()
