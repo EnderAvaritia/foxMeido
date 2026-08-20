@@ -5,8 +5,7 @@ from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 
 import re
 
-from . import noco_config as cfg
-from . import noco_utils as utils
+from plugins.db import get_records
 from plugins.steam_utils import extract_steam_id
 from plugins.message_reaction import reaction_cleanup
 
@@ -42,8 +41,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
 
     game_id = extract_steam_id(input_text) or input_text
 
-    url = cfg.url_with_filter(cfg.WISHLIST_TABLE_ID, f"(gameId,eq,{game_id})", sort="submitTime")
-    records_data = utils.get_records(url)
+    records_data = get_records("wishlist", [("gameId", "eq", game_id)], sort="submitTime")
     output = format_wishlist_response(records_data)
     if cleanup: await cleanup()
     await queryWishlist.finish(output)

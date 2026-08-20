@@ -14,7 +14,7 @@ from playwright.async_api import async_playwright
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
-from . import noco_config as cfg
+from plugins.db import config as cfg
 from plugins.playwright_utils import load_cookie_file, get_headless
 from plugins.message_reaction import reaction_cleanup
 

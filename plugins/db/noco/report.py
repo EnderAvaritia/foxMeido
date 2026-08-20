@@ -23,8 +23,7 @@ from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 
 import re
 
-from . import noco_config as cfg
-from . import noco_utils as utils
+from plugins.db import get_records, update_record
 from plugins.steam_utils import extract_steam_id
 from plugins.message_reaction import reaction_cleanup
 
@@ -36,12 +35,11 @@ def batch_update_records(records: list) -> tuple[int, int, list[str]]:
     success = 0
     failed = 0
     details: list[str] = []
-    url = cfg.table_url(cfg.RECORD_TABLE_ID)
     for r in records:
         rid = r.get("id")
         name = r.get("userName", "未知用户")
         game = r.get("gameName", "未知游戏")
-        result = utils.update_record(url, {"id": rid, "report": 1})
+        result = update_record("records", rid, {"report": 1})
         if "error" in result:
             failed += 1
             details.append(f"{name} - {game}: 更新失败 ({result['error']})")
@@ -70,10 +68,10 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
 
     await report.send(f"正在查询游戏ID为 {game_id} 的未报告记录...")
 
-    url = cfg.url_with_filter(
-        cfg.RECORD_TABLE_ID, f"(gameId,eq,{game_id})~and(report,eq,0)"
+    records_data = get_records(
+        "records",
+        [("gameId", "eq", game_id), ("report", "eq", 0)],
     )
-    records_data = utils.get_records(url)
 
     if "error" in records_data:
         if cleanup: await cleanup()

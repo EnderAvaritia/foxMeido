@@ -7,8 +7,8 @@ import datetime
 import json
 import re
 
-from . import noco_config as cfg
-from . import noco_utils as utils
+from plugins.db import config as cfg
+from plugins.db import get_record, create_record, update_record
 from plugins.steam_utils import extract_steam_id, get_game_info
 from plugins.message_reaction import reaction_cleanup
 
@@ -50,8 +50,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
 
     # 检查游戏剩余数量（可由 NOCO_CHECK_REMAIN 环境变量关闭）
     if cfg.CHECK_REMAIN:
-        remainUrl = cfg.url_with_filter(cfg.REMAIN_TABLE_ID, f"(gameId,eq,{goodId})")
-        remainGameRecord = utils.get_record(remainUrl)
+        remainGameRecord = get_record("remain", [("gameId", "eq", goodId)])
         if "id" not in remainGameRecord:
             if cleanup: await cleanup()
             await get.finish(
@@ -64,17 +63,16 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
             )
 
     # 检查账号绑定
-    accountUrl = cfg.url_with_filter(cfg.ACCOUNT_TABLE_ID, f"(account,eq,{userId})")
-    accountRecord = utils.get_record(accountUrl)
+    accountRecord = get_record("account", [("account", "eq", userId)])
     if "id" not in accountRecord:
         if cleanup: await cleanup()
         await get.finish(f"用户ID {userId} 尚未绑定，请先使用bind指令进行登记")
 
     # 检查是否已登记过该游戏
-    checkUrl = cfg.url_with_filter(
-        cfg.RECORD_TABLE_ID, f"(gameId,eq,{goodId})~and(userId,eq,{userId})"
+    existingRecord = get_record(
+        "records",
+        [("gameId", "eq", goodId), ("userId", "eq", userId)],
     )
-    existingRecord = utils.get_record(checkUrl)
     if "id" in existingRecord:
         if cleanup: await cleanup()
         await get.finish(
@@ -99,7 +97,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
         "getTime": dayTime,
         "publisher": gameInfo["publisher"],
     }
-    recordResult = utils.create_record(cfg.table_url(cfg.RECORD_TABLE_ID), recordPayload)
+    recordResult = create_record("records", recordPayload)
     if "id" not in recordResult:
         if cleanup: await cleanup()
         await get.finish(f"登记阶段出现未知错误，请反馈")
@@ -108,14 +106,13 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
     if cfg.CHECK_REMAIN:
         canBeClaimed = remainGameRecord["totalCount"] - remainGameRecord["getedCount"] - 1
         remainPayload = {
-            "id": remainGameRecord["id"],
             "gameId": goodId,
             "gameName": gameInfo["game_name"],
             "totalCount": remainGameRecord["totalCount"],
             "getedCount": remainGameRecord["getedCount"] + 1,
             "canBeClaimed": canBeClaimed,
         }
-        remain = utils.update_record(cfg.table_url(cfg.REMAIN_TABLE_ID), remainPayload)
+        remain = update_record("remain", remainGameRecord["id"], remainPayload)
         if "id" in remain:
             if cleanup: await cleanup()
             await get.finish(

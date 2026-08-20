@@ -57,9 +57,16 @@ PORT=26657
 COMMAND_START=[""] 
 ```
 
-### NocoDB（可选）
+### 数据库（可选）
 
-登记游戏领取记录的后端数据库。自行部署 [nocodb/nocodb](https://github.com/nocodb/nocodb)。
+登记游戏领取记录的后端数据库，两种后端可选：**SQLite**（默认）或 **NocoDB**。
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `DB_BACKEND` | 智能默认 | 后端选择：`sqlite`（默认）或 `noco`。不设置时若检测到 `NOCO_TOKEN` 已配置则默认 `noco`，否则 `sqlite` |
+| `SQLITE_PATH` | `data/db/foxmeido.db` | SQLite 数据库文件路径（仅 `sqlite` 后端使用，首次使用自动建表） |
+
+**NocoDB 后端**（`DB_BACKEND=noco` 时需自行部署 [nocodb/nocodb](https://github.com/nocodb/nocodb)）：
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
@@ -71,6 +78,16 @@ COMMAND_START=[""]
 | `NOCO_CHECK_REMAIN` | `true` | `get` 指令是否检查 remain 表剩余副本数；`false` 时跳过检查直接登记 |
 | `NOCO_WISHLIST_TABLE` | — | wishlist 表格 ID |
 | `NOCO_VERIFY_SSL` | `false` | 是否验证 SSL（国内自建通常用自签名证书，默认关闭） |
+
+**后端迁移**：两个后端可随时切换，数据迁移用 `scripts/migrate_db.py`：
+
+```bash
+# NocoDB → SQLite（换 sqlite 后端前执行）
+python scripts/migrate_db.py --from noco --to sqlite
+
+# SQLite → NocoDB（回迁）
+python scripts/migrate_db.py --from sqlite --to noco
+```
 
 ### 代理（可选）
 
@@ -289,6 +306,7 @@ foxMeido/
 │   ├── get_steam_cookies.py    # 获取 Playwright 格式的 Steam cookie
 │   ├── get_curator_cookies.py  # 获取鉴赏家后台 Playwright cookie
 │   ├── fix_curator_db.py       # 修复 curator 数据库 first_seen_at 记录
+│   ├── migrate_db.py           # NocoDB ↔ SQLite 双向迁移
 │   ├── steam_reviews.md         # steam_reviews.py 使用说明
 │   └── steam_reviews.py        # 提取 Steam 用户评测中的鉴赏家链接 → [`doc`](scripts/steam_reviews.md)
 ├── data/                 # 运行时数据（gitignore）
@@ -314,12 +332,13 @@ foxMeido/
     ├── auto_pull.py        # 自动拉取仓库更新（定时 + 手动命令）
     ├── message_reaction.py # 表情回复模块（核心函数 + 自动钩子）
     ├── error_logger.py     # 错误日志模块（全模块共用）
-    └── noco/
-        ├── __init__.py
-        ├── noco_config.py       # 配置中心
-        ├── noco_utils.py        # NocoDB 工具函数
-        ├── bind.py / get.py / wish.py / ...
-        └── README.md            # NocoDB 子模块文档
+    └── db/                 # 统一数据库访问层（sqlite / noco 双后端）
+        ├── __init__.py     #   统一接口：get_record / get_records / create_record / update_record
+        ├── config.py       #   配置中心（DB_BACKEND 后端选择等）
+        ├── sqlite.py       #   SQLite 后端实现
+        ├── noco_backend.py #   NocoDB 后端实现
+        └── noco/           #   NocoDB 命令插件（bind/get/wish/remain/...）
+            └── README.md   #   NocoDB 子模块文档
 ```
 
 ## TODO

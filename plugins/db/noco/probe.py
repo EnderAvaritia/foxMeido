@@ -26,8 +26,8 @@ import json
 import re
 import time
 
-from . import noco_config as cfg
-from . import noco_utils as utils
+from plugins.db import config as cfg
+from plugins.db import get_records, update_record
 from plugins.message_reaction import reaction_cleanup
 
 probe = on_command("probe", aliases={"probe"}, priority=10, block=True)
@@ -82,8 +82,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
     cleanup = await reaction_cleanup(bot, event)
     await probe.send("开始检测record表中的link有效性...")
 
-    url = cfg.url_with_filter(cfg.RECORD_TABLE_ID, "(submitTime,eq,null)", sort="userId")
-    records_data = utils.get_records(url)
+    records_data = get_records("records", [("submitTime", "eq", None)], sort="userId")
 
     if "error" in records_data:
         if cleanup: await cleanup()
@@ -110,8 +109,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
         is_valid, _ = check_link_valid(link)
         if is_valid:
             today = datetime.date.today().strftime("%Y-%m-%d")
-            payload = {"id": record["id"], "submitTime": today}
-            result = utils.update_record(cfg.table_url(cfg.RECORD_TABLE_ID), payload)
+            result = update_record("records", record["id"], {"submitTime": today})
             if "error" not in result:
                 success_count += 1
                 completed_records.append(record)

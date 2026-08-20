@@ -38,9 +38,9 @@ from nonebot.plugin import on_command
 from nonebot.log import logger
 from nonebot.exception import FinishedException
 
-from plugins.noco.noco_config import table_url, REMAIN_TABLE_ID
 from plugins.env_utils import get_proxies
-from plugins.noco import noco_utils
+from plugins import db
+from plugins.db import config as db_cfg
 from plugins.message_reaction import reaction_cleanup
 from plugins.playwright_utils import ensure_browser, create_context
 
@@ -265,11 +265,10 @@ def save_seen_games(games: list[PendingGame]) -> None:
 
 
 def sync_to_remain(new_games: list[PendingGame]) -> None:
-    """将新增的游戏同步到 NocoDB remain 表。"""
-    if not REMAIN_TABLE_ID:
-        logger.info("NOCO_REMAIN_TABLE 未配置，跳过 NocoDB 同步")
+    """将新增的游戏同步到 remain 表（跟随 DB_BACKEND 后端）。"""
+    if db.BACKEND == "noco" and not db_cfg.REMAIN_TABLE_ID:
+        logger.info("NOCO_REMAIN_TABLE 未配置，跳过 remain 同步")
         return
-    url = table_url(REMAIN_TABLE_ID)
     for g in new_games:
         payload = {
             "gameId": int(g.app_id),
@@ -278,7 +277,7 @@ def sync_to_remain(new_games: list[PendingGame]) -> None:
             "getedCount": 0,
             "canBeClaimed": g.copies,
         }
-        result = noco_utils.create_record(url, payload)
+        result = db.create_record("remain", payload)
         if "error" not in result:
             logger.info("remain 同步成功: %s (appid=%s, copies=%d)", g.name, g.app_id, g.copies)
         else:

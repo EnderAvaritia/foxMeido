@@ -15,8 +15,8 @@ from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 
 import re
 
-from . import noco_config as cfg
-from . import noco_utils as utils
+from plugins.db import config as cfg
+from plugins.db import get_records
 from plugins.steam_utils import extract_steam_id
 from plugins.message_reaction import reaction_cleanup
 
@@ -75,12 +75,11 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
     else:
         await unreported.send("正在查询所有未报告（report=0）的记录...")
 
-    where = f"(report,eq,0)"
+    where = [("report", "eq", 0)]
     if game_id:
-        where += f"~and(gameId,eq,{game_id})"
-    url = cfg.url_with_filter(cfg.RECORD_TABLE_ID, where, sort="gameId")
+        where.append(("gameId", "eq", game_id))
 
-    records_data = utils.get_records(url)
+    records_data = get_records("records", where, sort="gameId")
     output = format_unreported_output(records_data)
     if cleanup: await cleanup()
     await unreported.finish(output)
