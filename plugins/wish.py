@@ -35,7 +35,12 @@ def add_to_wishlist(appid: str | int, cookie: str) -> bool:
         "Cookie": cookie.strip(),
     }
 
-    response = requests.post(url, data=payload, headers=headers, proxies=cfg.PROXIES)
+    try:
+        response = requests.post(
+            url, data=payload, headers=headers, proxies=cfg.PROXIES, timeout=10
+        )
+    except requests.exceptions.RequestException:
+        return False
     try:
         data = response.json()
     except ValueError:
