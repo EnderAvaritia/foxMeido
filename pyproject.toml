@@ -10,9 +10,7 @@ adapters = [
     { name = "OneBot V11", module_name = "nonebot.adapters.onebot.v11" }
 ]
 plugins = ["nonebot_plugin_alconna", "nonebot_plugin_apscheduler"]
-plugin_dirs = ["plugins"]
 
-# plugin_dirs = ["plugins", "plugins/noco"]
-# 附加内容
+plugin_dirs = ["plugins", "plugins/db", "plugins/db/noco"]
 
 builtin_plugins = ["echo"]
