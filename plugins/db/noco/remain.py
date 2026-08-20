@@ -27,9 +27,11 @@ from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 
 import re
 
-from plugins.db import get_record, get_records, create_record, update_record
+from plugins.db import get_backend
 from plugins.steam_utils import extract_steam_id, get_game_info
 from plugins.message_reaction import reaction_cleanup
+
+backend = get_backend()
 
 remain = on_command("remain", aliases={"remain"}, priority=10, block=True)
 
@@ -42,7 +44,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
     # ── 无参数：列出所有可领取的游戏 ──
     if not arg_text:
         try:
-            data = get_records("remain", [("canBeClaimed", "gt", 0)], sort="created_at")
+            data = backend.get_records("remain", [("canBeClaimed", "gt", 0)], sort="created_at")
             if "error" in data:
                 if cleanup: await cleanup()
                 await remain.finish(f"查询出错: {data['error']}")
@@ -70,7 +72,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
         await remain.finish("未检测到有效的游戏ID，请提供Steam游戏ID或Steam商店链接")
 
     # 查询现有记录
-    existing = get_record("remain", [("gameId", "eq", game_id)])
+    existing = backend.get_record("remain", [("gameId", "eq", game_id)])
 
     # ── 仅查询 ──
     if len(parts) == 1:
@@ -119,7 +121,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
                 "getedCount": existing["getedCount"],
                 "canBeClaimed": can_be_claimed,
             }
-            result = update_record("remain", existing["id"], payload)
+            result = backend.update_record("remain", existing["id"], payload)
             if "id" in result:
                 if cleanup: await cleanup()
                 await remain.finish(
@@ -140,7 +142,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
                 "getedCount": 0,
                 "canBeClaimed": count,
             }
-            result = create_record("remain", payload)
+            result = backend.create_record("remain", payload)
             if "id" in result:
                 if cleanup: await cleanup()
                 await remain.finish(

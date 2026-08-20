@@ -5,9 +5,11 @@ from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 
 import re
 
-from plugins.db import get_records
+from plugins.db import get_backend
 from plugins.steam_utils import extract_steam_id
 from plugins.message_reaction import reaction_cleanup
+
+backend = get_backend()
 
 queryWishlist = on_command("queryWishlist", aliases={"queryWishlist","queryWish","qwish"}, priority=10, block=True)
 
@@ -41,7 +43,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
 
     game_id = extract_steam_id(input_text) or input_text
 
-    records_data = get_records("wishlist", [("gameId", "eq", game_id)], sort="submitTime")
+    records_data = backend.get_records("wishlist", [("gameId", "eq", game_id)], sort="submitTime")
     output = format_wishlist_response(records_data)
     if cleanup: await cleanup()
     await queryWishlist.finish(output)

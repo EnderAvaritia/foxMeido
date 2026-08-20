@@ -16,9 +16,11 @@ from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 import re
 
 from plugins.db import config as cfg
-from plugins.db import get_records
+from plugins.db import get_backend
 from plugins.steam_utils import extract_steam_id
 from plugins.message_reaction import reaction_cleanup
+
+backend = get_backend()
 
 unreported = on_command("unreported", aliases={"unreported"}, priority=10, block=True)
 
@@ -79,7 +81,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
     if game_id:
         where.append(("gameId", "eq", game_id))
 
-    records_data = get_records("records", where, sort="gameId")
+    records_data = backend.get_records("records", where, sort="gameId")
     output = format_unreported_output(records_data)
     if cleanup: await cleanup()
     await unreported.finish(output)

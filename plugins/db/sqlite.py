@@ -1,7 +1,7 @@
 """
-db/sqlite.py - SQLite 后端实现
+db/sqlite.py - SQLite 后端指令（SqliteBackend）
 
-结构化查询接口（与 noco_backend 保持一致）：
+实现 plugins/db/base.py 的 DatabaseBackend 抽象接口：
   get_record(table, where=None, sort="")       -> dict | "" | {"error": ...}
   get_records(table, where=None, sort="")      -> {"list": [...], "pageInfo": {"totalRows": n}} | {"error": ...}
   create_record(table, payload)                -> 新建记录 dict（含 "id"）| {"error": ...}
@@ -13,6 +13,11 @@ where 格式：[(field, op, value), ...]，op ∈ {"eq", "gt", "ne"}
 
 表结构与 plugins/db/noco/createTables.sql 完全一致（含系统列），
 不加唯一约束，行为与 NocoDB 后端对齐。首次使用时自动建表。
+
+用法（通过抽象层获取实例）：
+  from plugins.db import get_backend
+  backend = get_backend()          # DB_BACKEND=sqlite 时返回 SqliteBackend 实例
+  rec = backend.get_record("account", [("account", "eq", "123456")])
 """
 
 from __future__ import annotations
@@ -21,6 +26,7 @@ import os
 import sqlite3
 from typing import Any
 
+from .base import DatabaseBackend
 from .config import SQLITE_PATH
 from plugins.error_logger import log_error
 
@@ -177,108 +183,116 @@ def _row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
     return dict(row) if row is not None else None
 
 
-# ── 公共接口 ───────────────────────────────────────────────────
+# ── 公共接口（SqliteBackend 指令） ─────────────────────────────
 
-def get_record(
-    table: str, where: list[tuple[str, str, Any]] | None = None, sort: str = ""
-) -> dict[str, Any] | str:
-    """查询单条记录。空结果返回空字符串，失败返回 {"error": ...}。"""
-    try:
-        _validate_table(table)
-        where_sql, params = _build_where_clause(table, where)
-        sort_sql = _build_sort_clause(table, sort)
-        conn = _get_conn()
+class SqliteBackend(DatabaseBackend):
+    """SQLite 后端指令：实现 DatabaseBackend 抽象接口。"""
+
+    name = "sqlite"
+
+    def get_record(
+        self,
+        table: str,
+        where: list[tuple[str, str, Any]] | None = None,
+        sort: str = "",
+    ) -> dict[str, Any] | str:
+        """查询单条记录。空结果返回空字符串，失败返回 {"error": ...}。"""
         try:
-            sql = f'SELECT * FROM "{table}"'
-            if where_sql:
-                sql += f" WHERE {where_sql}"
-            sql += sort_sql
-            row = conn.execute(sql, params).fetchone()
-            result = _row_to_dict(row)
-            return result if result is not None else ""
-        finally:
-            conn.close()
-    except Exception as e:
-        log_error("db.sqlite.get_record", f"查询失败: {e}")
-        return {"error": f"查询失败: {e}"}
+            _validate_table(table)
+            where_sql, params = _build_where_clause(table, where)
+            sort_sql = _build_sort_clause(table, sort)
+            conn = _get_conn()
+            try:
+                sql = f'SELECT * FROM "{table}"'
+                if where_sql:
+                    sql += f" WHERE {where_sql}"
+                sql += sort_sql
+                row = conn.execute(sql, params).fetchone()
+                result = _row_to_dict(row)
+                return result if result is not None else ""
+            finally:
+                conn.close()
+        except Exception as e:
+            log_error("db.sqlite.get_record", f"查询失败: {e}")
+            return {"error": f"查询失败: {e}"}
 
-
-def get_records(
-    table: str, where: list[tuple[str, str, Any]] | None = None, sort: str = ""
-) -> dict[str, Any]:
-    """通用查询记录列表，返回 {"list": [...], "pageInfo": {"totalRows": n}}。"""
-    try:
-        _validate_table(table)
-        where_sql, params = _build_where_clause(table, where)
-        sort_sql = _build_sort_clause(table, sort)
-        conn = _get_conn()
+    def get_records(
+        self,
+        table: str,
+        where: list[tuple[str, str, Any]] | None = None,
+        sort: str = "",
+    ) -> dict[str, Any]:
+        """通用查询记录列表，返回 {"list": [...], "pageInfo": {"totalRows": n}}。"""
         try:
-            sql = f'SELECT * FROM "{table}"'
-            if where_sql:
-                sql += f" WHERE {where_sql}"
-            sql += sort_sql
-            rows = conn.execute(sql, params).fetchall()
-            records = [dict(r) for r in rows]
-            return {"list": records, "pageInfo": {"totalRows": len(records)}}
-        finally:
-            conn.close()
-    except Exception as e:
-        log_error("db.sqlite.get_records", f"查询失败: {e}")
-        return {"error": f"查询失败: {e}"}
+            _validate_table(table)
+            where_sql, params = _build_where_clause(table, where)
+            sort_sql = _build_sort_clause(table, sort)
+            conn = _get_conn()
+            try:
+                sql = f'SELECT * FROM "{table}"'
+                if where_sql:
+                    sql += f" WHERE {where_sql}"
+                sql += sort_sql
+                rows = conn.execute(sql, params).fetchall()
+                records = [dict(r) for r in rows]
+                return {"list": records, "pageInfo": {"totalRows": len(records)}}
+            finally:
+                conn.close()
+        except Exception as e:
+            log_error("db.sqlite.get_records", f"查询失败: {e}")
+            return {"error": f"查询失败: {e}"}
 
-
-def create_record(table: str, payload: dict[str, Any]) -> dict[str, Any]:
-    """在指定表创建一条记录，返回含 "id" 的记录。失败返回 {"error": ...}。"""
-    try:
-        _validate_table(table)
-        data = _filter_payload(table, payload)
-        if not data:
-            raise ValueError("payload 中没有有效字段")
-        conn = _get_conn()
+    def create_record(self, table: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """在指定表创建一条记录，返回含 "id" 的记录。失败返回 {"error": ...}。"""
         try:
-            fields = list(data.keys())
-            placeholders = ", ".join("?" for _ in fields)
-            sql = (
-                f'INSERT INTO "{table}" ({", ".join(fields)}) '
-                f"VALUES ({placeholders})"
-            )
-            cur = conn.execute(sql, list(data.values()))
-            conn.commit()
-            new_id = cur.lastrowid
-            row = conn.execute(f'SELECT * FROM "{table}" WHERE id = ?', (new_id,)).fetchone()
-            result = _row_to_dict(row) or {"id": new_id, **data}
-            return result
-        finally:
-            conn.close()
-    except Exception as e:
-        log_error("db.sqlite.create_record", f"创建失败: {e}")
-        return {"error": f"创建失败: {e}"}
+            _validate_table(table)
+            data = _filter_payload(table, payload)
+            if not data:
+                raise ValueError("payload 中没有有效字段")
+            conn = _get_conn()
+            try:
+                fields = list(data.keys())
+                placeholders = ", ".join("?" for _ in fields)
+                sql = (
+                    f'INSERT INTO "{table}" ({", ".join(fields)}) '
+                    f"VALUES ({placeholders})"
+                )
+                cur = conn.execute(sql, list(data.values()))
+                conn.commit()
+                new_id = cur.lastrowid
+                row = conn.execute(f'SELECT * FROM "{table}" WHERE id = ?', (new_id,)).fetchone()
+                result = _row_to_dict(row) or {"id": new_id, **data}
+                return result
+            finally:
+                conn.close()
+        except Exception as e:
+            log_error("db.sqlite.create_record", f"创建失败: {e}")
+            return {"error": f"创建失败: {e}"}
 
-
-def update_record(
-    table: str, record_id: int, payload: dict[str, Any]
-) -> dict[str, Any]:
-    """更新指定 id 的记录，返回更新后的记录（含 "id"）。失败返回 {"error": ...}。"""
-    try:
-        _validate_table(table)
-        data = _filter_payload(table, payload)
-        if not data:
-            raise ValueError("payload 中没有有效字段")
-        conn = _get_conn()
+    def update_record(
+        self, table: str, record_id: int, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        """更新指定 id 的记录，返回更新后的记录（含 "id"）。失败返回 {"error": ...}。"""
         try:
-            sets = ", ".join(f'"{k}" = ?' for k in data)
-            sql = f'UPDATE "{table}" SET {sets} WHERE id = ?'
-            cur = conn.execute(sql, list(data.values()) + [record_id])
-            conn.commit()
-            if cur.rowcount == 0:
-                return {"error": "记录不存在"}
-            row = conn.execute(f'SELECT * FROM "{table}" WHERE id = ?', (record_id,)).fetchone()
-            result = _row_to_dict(row)
-            if result is None:
-                return {"error": "记录不存在"}
-            return result
-        finally:
-            conn.close()
-    except Exception as e:
-        log_error("db.sqlite.update_record", f"更新失败: {e}")
-        return {"error": f"更新失败: {e}"}
+            _validate_table(table)
+            data = _filter_payload(table, payload)
+            if not data:
+                raise ValueError("payload 中没有有效字段")
+            conn = _get_conn()
+            try:
+                sets = ", ".join(f'"{k}" = ?' for k in data)
+                sql = f'UPDATE "{table}" SET {sets} WHERE id = ?'
+                cur = conn.execute(sql, list(data.values()) + [record_id])
+                conn.commit()
+                if cur.rowcount == 0:
+                    return {"error": "记录不存在"}
+                row = conn.execute(f'SELECT * FROM "{table}" WHERE id = ?', (record_id,)).fetchone()
+                result = _row_to_dict(row)
+                if result is None:
+                    return {"error": "记录不存在"}
+                return result
+            finally:
+                conn.close()
+        except Exception as e:
+            log_error("db.sqlite.update_record", f"更新失败: {e}")
+            return {"error": f"更新失败: {e}"}

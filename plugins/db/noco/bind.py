@@ -5,8 +5,10 @@ from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 
 import re
 
-from plugins.db import get_record, create_record, update_record
+from plugins.db import get_backend
 from plugins.message_reaction import reaction_cleanup
+
+backend = get_backend()
 
 bind = on_command("bind", aliases={"bind"}, priority=10, block=True)
 
@@ -17,7 +19,7 @@ async def handle_function(bot, event):
     userId = str(event.user_id)
     nickname = event.sender.nickname
 
-    record = get_record("account", [("account", "eq", userId)])
+    record = backend.get_record("account", [("account", "eq", userId)])
 
     message_text = str(event.get_message())
     steamid = re.findall(
@@ -32,7 +34,7 @@ async def handle_function(bot, event):
 
     if "id" not in record:
         payload = {"account": userId, "steamId": steamid, "nickname": nickname}
-        result = create_record("account", payload)
+        result = backend.create_record("account", payload)
         if cleanup: await cleanup()
         await bind.finish(
             f"{nickname}用户的id：{userId}\n{steamid}\n已被登记为第{result['id']}个结果"
@@ -43,7 +45,7 @@ async def handle_function(bot, event):
             "steamId": steamid,
             "nickname": nickname,
         }
-        result = update_record("account", record["id"], payload)
+        result = backend.update_record("account", record["id"], payload)
         if record["id"] == result["id"]:
             if cleanup: await cleanup()
             await bind.finish(f"{nickname}用户的id：{userId}\n{steamid}已被更新")

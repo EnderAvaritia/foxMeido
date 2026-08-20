@@ -23,9 +23,11 @@ from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 
 import re
 
-from plugins.db import get_records, update_record
+from plugins.db import get_backend
 from plugins.steam_utils import extract_steam_id
 from plugins.message_reaction import reaction_cleanup
+
+backend = get_backend()
 
 report = on_command("report", aliases={"report"}, priority=10, block=True)
 
@@ -39,7 +41,7 @@ def batch_update_records(records: list) -> tuple[int, int, list[str]]:
         rid = r.get("id")
         name = r.get("userName", "未知用户")
         game = r.get("gameName", "未知游戏")
-        result = update_record("records", rid, {"report": 1})
+        result = backend.update_record("records", rid, {"report": 1})
         if "error" in result:
             failed += 1
             details.append(f"{name} - {game}: 更新失败 ({result['error']})")
@@ -68,7 +70,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
 
     await report.send(f"正在查询游戏ID为 {game_id} 的未报告记录...")
 
-    records_data = get_records(
+    records_data = backend.get_records(
         "records",
         [("gameId", "eq", game_id), ("report", "eq", 0)],
     )

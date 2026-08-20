@@ -13,8 +13,10 @@ from nonebot.adapters import Message
 from nonebot.params import CommandArg
 from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 
-from plugins.db import get_records
+from plugins.db import get_backend
 from plugins.message_reaction import reaction_cleanup
+
+backend = get_backend()
 
 unfinished = on_command("unfinished", aliases={"unfinished"}, priority=10, block=True)
 
@@ -50,7 +52,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
     cleanup = await reaction_cleanup(bot, event)
     await unfinished.send("正在查询未完成的记录...")
 
-    records_data = get_records("records", [("submitTime", "eq", None)], sort="userId")
+    records_data = backend.get_records("records", [("submitTime", "eq", None)], sort="userId")
     output = format_unfinished_output(records_data)
 
     if cleanup: await cleanup()

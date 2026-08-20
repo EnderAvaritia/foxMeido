@@ -39,10 +39,12 @@ from nonebot.log import logger
 from nonebot.exception import FinishedException
 
 from plugins.env_utils import get_proxies
-from plugins import db
+from plugins.db import get_backend
 from plugins.db import config as db_cfg
 from plugins.message_reaction import reaction_cleanup
 from plugins.playwright_utils import ensure_browser, create_context
+
+backend = get_backend()
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler  # noqa: E402
@@ -266,7 +268,7 @@ def save_seen_games(games: list[PendingGame]) -> None:
 
 def sync_to_remain(new_games: list[PendingGame]) -> None:
     """将新增的游戏同步到 remain 表（跟随 DB_BACKEND 后端）。"""
-    if db.BACKEND == "noco" and not db_cfg.REMAIN_TABLE_ID:
+    if db_cfg.BACKEND == "noco" and not db_cfg.REMAIN_TABLE_ID:
         logger.info("NOCO_REMAIN_TABLE 未配置，跳过 remain 同步")
         return
     for g in new_games:
@@ -277,7 +279,7 @@ def sync_to_remain(new_games: list[PendingGame]) -> None:
             "getedCount": 0,
             "canBeClaimed": g.copies,
         }
-        result = db.create_record("remain", payload)
+        result = backend.create_record("remain", payload)
         if "error" not in result:
             logger.info("remain 同步成功: %s (appid=%s, copies=%d)", g.name, g.app_id, g.copies)
         else:

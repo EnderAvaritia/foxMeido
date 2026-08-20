@@ -1,7 +1,7 @@
 """
-db/noco_backend.py - NocoDB 后端实现
+db/noco_backend.py - NocoDB 后端指令（NocoBackend）
 
-结构化查询接口（与 sqlite 后端保持一致）：
+实现 plugins/db/base.py 的 DatabaseBackend 抽象接口：
   get_record(table, where=None, sort="")       -> dict | "" | {"error": ...}
   get_records(table, where=None, sort="")      -> {"list": [...], "pageInfo": {...}} | {"error": ...}
   create_record(table, payload)                -> 新建记录 dict（含 "id"）| {"error": ...}
@@ -12,6 +12,11 @@ where 格式：[(field, op, value), ...]，op ∈ {"eq", "gt", "ne"}
   - 内部翻译为 NocoDB where 语法：(field,op,value)~and(...)
 
 逻辑表名（account/records/remain/wishlist）在 config 中映射到 NOCO_*_TABLE。
+
+用法（通过抽象层获取实例）：
+  from plugins.db import get_backend
+  backend = get_backend()          # DB_BACKEND=noco 时返回 NocoBackend 实例
+  rec = backend.get_record("account", [("account", "eq", "123456")])
 """
 
 from __future__ import annotations
@@ -21,6 +26,7 @@ from typing import Any
 
 import requests
 
+from .base import DatabaseBackend
 from .config import (
     request_kwargs,
     post_kwargs,
@@ -109,72 +115,80 @@ def _do_write(url: str, payload: dict[str, Any], method: str) -> dict[str, Any]:
         return {"error": f"未知错误: {e}"}
 
 
-# ── 公共接口 ───────────────────────────────────────────────────
+# ── 公共接口（NocoBackend 指令） ───────────────────────────────
 
-def get_record(
-    table: str, where: list[tuple[str, str, Any]] | None = None, sort: str = ""
-) -> dict[str, Any] | str:
-    """查询单条记录。空结果返回空字符串，失败返回 {"error": ...}。"""
-    try:
-        table_id = _table_id(table)
-        if not table_id:
-            return {"error": f"表 {table} 未配置（缺少对应的 NOCO_*_TABLE）"}
-        where_str = _build_where(where)
-        url = url_with_filter(table_id, where_str, sort=sort)
-        data = _do_get(url)
-        if not isinstance(data, dict):
-            return {"error": "响应格式异常"}
-        if "error" in data:
+class NocoBackend(DatabaseBackend):
+    """NocoDB 后端指令：实现 DatabaseBackend 抽象接口。"""
+
+    name = "noco"
+
+    def get_record(
+        self,
+        table: str,
+        where: list[tuple[str, str, Any]] | None = None,
+        sort: str = "",
+    ) -> dict[str, Any] | str:
+        """查询单条记录。空结果返回空字符串，失败返回 {"error": ...}。"""
+        try:
+            table_id = _table_id(table)
+            if not table_id:
+                return {"error": f"表 {table} 未配置（缺少对应的 NOCO_*_TABLE）"}
+            where_str = _build_where(where)
+            url = url_with_filter(table_id, where_str, sort=sort)
+            data = _do_get(url)
+            if not isinstance(data, dict):
+                return {"error": "响应格式异常"}
+            if "error" in data:
+                return data
+            if data.get("list"):
+                return data["list"][0]
+            return ""
+        except Exception as e:
+            log_error("db.noco_backend.get_record", f"查询失败: {e}")
+            return {"error": f"查询失败: {e}"}
+
+    def get_records(
+        self,
+        table: str,
+        where: list[tuple[str, str, Any]] | None = None,
+        sort: str = "",
+    ) -> dict[str, Any]:
+        """通用查询记录列表，返回完整响应字典（含 list / pageInfo）。"""
+        try:
+            table_id = _table_id(table)
+            if not table_id:
+                return {"error": f"表 {table} 未配置（缺少对应的 NOCO_*_TABLE）"}
+            where_str = _build_where(where)
+            url = url_with_filter(table_id, where_str, sort=sort)
+            data = _do_get(url)
+            if not isinstance(data, dict):
+                return {"error": "响应格式异常"}
             return data
-        if data.get("list"):
-            return data["list"][0]
-        return ""
-    except Exception as e:
-        log_error("db.noco_backend.get_record", f"查询失败: {e}")
-        return {"error": f"查询失败: {e}"}
+        except Exception as e:
+            log_error("db.noco_backend.get_records", f"查询失败: {e}")
+            return {"error": f"查询失败: {e}"}
 
+    def create_record(self, table: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """在指定表格创建一条记录。失败时返回 {"error": ...}。"""
+        try:
+            table_id = _table_id(table)
+            if not table_id:
+                return {"error": f"表 {table} 未配置（缺少对应的 NOCO_*_TABLE）"}
+            return _do_write(table_url(table_id), payload, "POST")
+        except Exception as e:
+            log_error("db.noco_backend.create_record", f"创建失败: {e}")
+            return {"error": f"创建失败: {e}"}
 
-def get_records(
-    table: str, where: list[tuple[str, str, Any]] | None = None, sort: str = ""
-) -> dict[str, Any]:
-    """通用查询记录列表，返回完整响应字典（含 list / pageInfo）。"""
-    try:
-        table_id = _table_id(table)
-        if not table_id:
-            return {"error": f"表 {table} 未配置（缺少对应的 NOCO_*_TABLE）"}
-        where_str = _build_where(where)
-        url = url_with_filter(table_id, where_str, sort=sort)
-        data = _do_get(url)
-        if not isinstance(data, dict):
-            return {"error": "响应格式异常"}
-        return data
-    except Exception as e:
-        log_error("db.noco_backend.get_records", f"查询失败: {e}")
-        return {"error": f"查询失败: {e}"}
-
-
-def create_record(table: str, payload: dict[str, Any]) -> dict[str, Any]:
-    """在指定表格创建一条记录。失败时返回 {"error": ...}。"""
-    try:
-        table_id = _table_id(table)
-        if not table_id:
-            return {"error": f"表 {table} 未配置（缺少对应的 NOCO_*_TABLE）"}
-        return _do_write(table_url(table_id), payload, "POST")
-    except Exception as e:
-        log_error("db.noco_backend.create_record", f"创建失败: {e}")
-        return {"error": f"创建失败: {e}"}
-
-
-def update_record(
-    table: str, record_id: int, payload: dict[str, Any]
-) -> dict[str, Any]:
-    """更新指定表格中的一条记录（PATCH）。失败时返回 {"error": ...}。"""
-    try:
-        table_id = _table_id(table)
-        if not table_id:
-            return {"error": f"表 {table} 未配置（缺少对应的 NOCO_*_TABLE）"}
-        body = {"id": record_id, **payload}
-        return _do_write(table_url(table_id), body, "PATCH")
-    except Exception as e:
-        log_error("db.noco_backend.update_record", f"更新失败: {e}")
-        return {"error": f"更新失败: {e}"}
+    def update_record(
+        self, table: str, record_id: int, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        """更新指定表格中的一条记录（PATCH）。失败时返回 {"error": ...}。"""
+        try:
+            table_id = _table_id(table)
+            if not table_id:
+                return {"error": f"表 {table} 未配置（缺少对应的 NOCO_*_TABLE）"}
+            body = {"id": record_id, **payload}
+            return _do_write(table_url(table_id), body, "PATCH")
+        except Exception as e:
+            log_error("db.noco_backend.update_record", f"更新失败: {e}")
+            return {"error": f"更新失败: {e}"}

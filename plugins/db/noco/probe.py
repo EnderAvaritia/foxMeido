@@ -27,8 +27,10 @@ import re
 import time
 
 from plugins.db import config as cfg
-from plugins.db import get_records, update_record
+from plugins.db import get_backend
 from plugins.message_reaction import reaction_cleanup
+
+backend = get_backend()
 
 probe = on_command("probe", aliases={"probe"}, priority=10, block=True)
 
@@ -82,7 +84,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
     cleanup = await reaction_cleanup(bot, event)
     await probe.send("开始检测record表中的link有效性...")
 
-    records_data = get_records("records", [("submitTime", "eq", None)], sort="userId")
+    records_data = backend.get_records("records", [("submitTime", "eq", None)], sort="userId")
 
     if "error" in records_data:
         if cleanup: await cleanup()
@@ -109,7 +111,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
         is_valid, _ = check_link_valid(link)
         if is_valid:
             today = datetime.date.today().strftime("%Y-%m-%d")
-            result = update_record("records", record["id"], {"submitTime": today})
+            result = backend.update_record("records", record["id"], {"submitTime": today})
             if "error" not in result:
                 success_count += 1
                 completed_records.append(record)

@@ -8,9 +8,11 @@ import json
 import re
 
 from plugins.db import config as cfg
-from plugins.db import get_record, create_record, update_record
+from plugins.db import get_backend
 from plugins.steam_utils import extract_steam_id, get_game_info
 from plugins.message_reaction import reaction_cleanup
+
+backend = get_backend()
 
 get = on_command("get", aliases={"get"}, priority=10, block=True)
 
@@ -50,7 +52,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
 
     # 检查游戏剩余数量（可由 NOCO_CHECK_REMAIN 环境变量关闭）
     if cfg.CHECK_REMAIN:
-        remainGameRecord = get_record("remain", [("gameId", "eq", goodId)])
+        remainGameRecord = backend.get_record("remain", [("gameId", "eq", goodId)])
         if "id" not in remainGameRecord:
             if cleanup: await cleanup()
             await get.finish(
@@ -63,13 +65,13 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
             )
 
     # 检查账号绑定
-    accountRecord = get_record("account", [("account", "eq", userId)])
+    accountRecord = backend.get_record("account", [("account", "eq", userId)])
     if "id" not in accountRecord:
         if cleanup: await cleanup()
         await get.finish(f"用户ID {userId} 尚未绑定，请先使用bind指令进行登记")
 
     # 检查是否已登记过该游戏
-    existingRecord = get_record(
+    existingRecord = backend.get_record(
         "records",
         [("gameId", "eq", goodId), ("userId", "eq", userId)],
     )
@@ -97,7 +99,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
         "getTime": dayTime,
         "publisher": gameInfo["publisher"],
     }
-    recordResult = create_record("records", recordPayload)
+    recordResult = backend.create_record("records", recordPayload)
     if "id" not in recordResult:
         if cleanup: await cleanup()
         await get.finish(f"登记阶段出现未知错误，请反馈")
@@ -112,7 +114,7 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
             "getedCount": remainGameRecord["getedCount"] + 1,
             "canBeClaimed": canBeClaimed,
         }
-        remain = update_record("remain", remainGameRecord["id"], remainPayload)
+        remain = backend.update_record("remain", remainGameRecord["id"], remainPayload)
         if "id" in remain:
             if cleanup: await cleanup()
             await get.finish(

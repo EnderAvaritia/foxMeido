@@ -332,11 +332,12 @@ foxMeido/
     ├── auto_pull.py        # 自动拉取仓库更新（定时 + 手动命令）
     ├── message_reaction.py # 表情回复模块（核心函数 + 自动钩子）
     ├── error_logger.py     # 错误日志模块（全模块共用）
-    └── db/                 # 统一数据库访问层（sqlite / noco 双后端）
-        ├── __init__.py     #   统一接口：get_record / get_records / create_record / update_record
+    └── db/                 # 数据库抽象层（sqlite / noco 双后端指令）
+        ├── __init__.py     #   抽象层：DatabaseBackend 接口 + get_backend() 工厂
+        ├── base.py         #   DatabaseBackend 抽象基类（接口定义）
         ├── config.py       #   配置中心（DB_BACKEND 后端选择等）
-        ├── sqlite.py       #   SQLite 后端实现
-        ├── noco_backend.py #   NocoDB 后端实现
+        ├── sqlite.py       #   SqliteBackend 指令（SQLite 后端实现）
+        ├── noco_backend.py #   NocoBackend 指令（NocoDB 后端实现）
         └── noco/           #   NocoDB 命令插件（bind/get/wish/remain/...）
             └── README.md   #   NocoDB 子模块文档
 ```

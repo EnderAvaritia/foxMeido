@@ -8,9 +8,11 @@ import requests
 import json
 
 from plugins.db import config as cfg
-from plugins.db import get_record, create_record, update_record
+from plugins.db import get_backend
 from plugins.steam_utils import extract_steam_id, get_game_info
 from plugins.message_reaction import reaction_cleanup
+
+backend = get_backend()
 
 wish = on_command("wish", aliases={"wish"}, priority=10, block=True)
 
@@ -61,12 +63,12 @@ async def handle_function(bot, event):
         if cleanup: await cleanup()
         await wish.finish(f"游戏{goodId}数据获取出错，请反馈")
 
-    accountRecord = get_record("account", [("account", "eq", userId)])
+    accountRecord = backend.get_record("account", [("account", "eq", userId)])
     if "id" not in accountRecord:
         if cleanup: await cleanup()
         await wish.finish(f"请id为{userId}的\n{nickname}先使用bind指令进行登记")
 
-    wishlistRecord = get_record(
+    wishlistRecord = backend.get_record(
         "wishlist",
         [("gameId", "eq", goodId), ("userId", "eq", userId)],
     )
@@ -77,7 +79,7 @@ async def handle_function(bot, event):
             "gameName": gameInfo["game_name"],
             "releaseDate": gameInfo["release_date"],
         }
-        updated = update_record("wishlist", wishlistRecord["id"], updatePayload)
+        updated = backend.update_record("wishlist", wishlistRecord["id"], updatePayload)
         if wishlistRecord["id"] == updated["id"]:
             if cleanup: await cleanup()
             await wish.finish(
@@ -98,7 +100,7 @@ async def handle_function(bot, event):
             "publisher": gameInfo["publisher"],
             "releaseDate": gameInfo["release_date"],
         }
-        recordResult = create_record("wishlist", createPayload)
+        recordResult = backend.create_record("wishlist", createPayload)
         if "id" not in recordResult:
             if cleanup: await cleanup()
             await wish.finish(f"登记阶段出现未知错误，请反馈")

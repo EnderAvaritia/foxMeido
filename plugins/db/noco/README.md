@@ -4,10 +4,11 @@
 
 ```
 plugins/db/
-├── __init__.py       # 统一数据库访问层（对外接口，按 DB_BACKEND 分发）
+├── __init__.py       # 抽象层：DatabaseBackend 接口 + get_backend() 工厂（按 DB_BACKEND 分发）
+├── base.py           # DatabaseBackend 抽象基类（两个后端共用的接口定义）
 ├── config.py         # 配置中心（原 noco_config.py，含 DB_BACKEND / SQLITE_PATH）
-├── sqlite.py         # SQLite 后端实现（结构化 where → SQL）
-├── noco_backend.py   # NocoDB 后端实现（结构化 where → NocoDB 语法）
+├── sqlite.py         # SqliteBackend 指令（SQLite 后端：结构化 where → SQL）
+├── noco_backend.py   # NocoBackend 指令（NocoDB 后端：结构化 where → NocoDB 语法）
 └── noco/             # 命令插件（本目录）
     ├── bind.py / get.py / wish.py / remain.py / probe.py
     ├── report.py / unfinished.py / unreported.py / queryWishlist.py
@@ -15,19 +16,23 @@ plugins/db/
     └── createTables.sql   # 4 张表的结构参考（sqlite 后端自动建表同源）
 ```
 
-## 统一接口
+## 统一接口（抽象层）
 
-所有命令插件都通过 `plugins.db` 的统一接口访问数据，不再直接操作 NocoDB API：
+sqlite 与 noco 各自实现为独立后端指令（`SqliteBackend` / `NocoBackend`），
+都继承 `DatabaseBackend` 抽象基类。命令插件通过 `get_backend()` 获取当前配置的后端实例，
+只依赖抽象接口，不感知具体后端：
 
 ```python
-from plugins.db import get_record, get_records, create_record, update_record
+from plugins.db import get_backend
 from plugins.db import config as cfg
 
+backend = get_backend()  # DB_BACKEND=sqlite → SqliteBackend，DB_BACKEND=noco → NocoBackend
+
 # where: [(field, op, value), ...]，op ∈ {eq, gt, ne}，value=None 表示 NULL 判断
-rec = get_record("account", [("account", "eq", "123456")])
-rows = get_records("remain", [("canBeClaimed", "gt", 0)], sort="created_at")
-rec = create_record("wishlist", {...})
-rec = update_record("records", 42, {"report": 1})
+rec = backend.get_record("account", [("account", "eq", "123456")])
+rows = backend.get_records("remain", [("canBeClaimed", "gt", 0)], sort="created_at")
+rec = backend.create_record("wishlist", {...})
+rec = backend.update_record("records", 42, {"report": 1})
 ```
 
 逻辑表名：`account` / `records` / `remain` / `wishlist`。
