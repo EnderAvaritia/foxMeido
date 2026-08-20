@@ -116,7 +116,7 @@ def _git(*args: str, timeout: int = 60) -> tuple[str, str, int]:
         result = subprocess.run(
             [_GIT_EXECUTABLE] + list(args),
             capture_output=True,
-            text=True,
+            encoding='utf-8',
             cwd=str(BASE_DIR),
             timeout=timeout,
         )
@@ -328,12 +328,13 @@ async def handleUpdate(bot, event):
         msg = await runPull(force=force)
         if cleanup:
             await cleanup()
-        await update_cmd.finish(msg, at_sender=False)
     except Exception as e:
         logger.exception("update 命令异常")
         if cleanup:
             await cleanup()
         await update_cmd.finish(f"❌ 命令异常: {e}", at_sender=False)
+        return
+    await update_cmd.finish(msg, at_sender=False)
 
 
 # ── 定时任务 ──────────────────────────────────────────────────────
