@@ -1,4 +1,6 @@
-# plugins/db/noco 说明
+# plugins/db 说明
+
+数据库抽象层：sqlite / noco 双后端指令 + 统一访问接口。
 
 ## 目录结构
 
@@ -9,12 +11,12 @@ plugins/db/
 ├── config.py         # 配置中心（原 noco_config.py，含 DB_BACKEND / SQLITE_PATH）
 ├── sqlite.py         # SqliteBackend 指令（SQLite 后端：结构化 where → SQL）
 ├── noco_backend.py   # NocoBackend 指令（NocoDB 后端：结构化 where → NocoDB 语法）
-└── noco/             # 命令插件（本目录）
-    ├── bind.py / get.py / wish.py / remain.py / probe.py
-    ├── report.py / unfinished.py / unreported.py / queryWishlist.py
-    ├── calendar.py
-    └── createTables.sql   # 4 张表的结构参考（sqlite 后端自动建表同源）
+└── createTables.sql  # 4 张表的结构参考（sqlite 后端自动建表同源）
 ```
+
+> 命令插件（bind / get / wish / remain / probe / report / unfinished / unreported / queryWishlist / calendar）
+> 已移出到 `plugins/` 根目录，与 cs / dota / help 等其他命令插件平级，
+> 通过本抽象层的 `get_backend()` 访问数据库。
 
 ## 统一接口（抽象层）
 

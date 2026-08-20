@@ -332,14 +332,24 @@ foxMeido/
     ├── auto_pull.py        # 自动拉取仓库更新（定时 + 手动命令）
     ├── message_reaction.py # 表情回复模块（核心函数 + 自动钩子）
     ├── error_logger.py     # 错误日志模块（全模块共用）
+    ├── bind.py           # 登记 Steam ID（绑定账号）
+    ├── get.py            # 登记游戏领取记录
+    ├── wish.py           # 愿望单登记
+    ├── remain.py         # 剩余份数登记/查询
+    ├── probe.py          # 检测领取记录链接是否有效
+    ├── report.py         # 标记游戏已报告
+    ├── unfinished.py     # 输出未完成记录
+    ├── unreported.py     # 输出未报告记录
+    ├── queryWishlist.py  # 查询愿望单记录
+    ├── calendar.py       # Steam 个人日历截图
     └── db/                 # 数据库抽象层（sqlite / noco 双后端指令）
         ├── __init__.py     #   抽象层：DatabaseBackend 接口 + get_backend() 工厂
         ├── base.py         #   DatabaseBackend 抽象基类（接口定义）
         ├── config.py       #   配置中心（DB_BACKEND 后端选择等）
         ├── sqlite.py       #   SqliteBackend 指令（SQLite 后端实现）
         ├── noco_backend.py #   NocoBackend 指令（NocoDB 后端实现）
-        └── noco/           #   NocoDB 命令插件（bind/get/wish/remain/...）
-            └── README.md   #   NocoDB 子模块文档
+        ├── createTables.sql#   4 张表结构参考（sqlite 自动建表同源）
+        └── README.md       #   数据库抽象层文档
 ```
 
 ## TODO

@@ -11,7 +11,7 @@ where 格式：[(field, op, value), ...]，op ∈ {"eq", "gt", "ne"}
   - value 为 None 时：eq → IS NULL，ne → IS NOT NULL
   - 条件之间为 AND 关系
 
-表结构与 plugins/db/noco/createTables.sql 完全一致（含系统列），
+表结构与 plugins/db/createTables.sql 完全一致（含系统列），
 不加唯一约束，行为与 NocoDB 后端对齐。首次使用时自动建表。
 
 用法（通过抽象层获取实例）：
