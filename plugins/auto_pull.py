@@ -15,7 +15,8 @@ auto_pull.py - 自动拉取仓库更新插件
   GIT_AUTO_PULL_NOTIFY_GROUP=          # 拉取结果通知的目标群号（可选）
   GIT_AUTO_PULL_REMOTE=origin          # 远程仓库名或 URL（如 origin 或 https://github.com/user/repo.git）
   GIT_AUTO_PULL_GIT_PATH=git           # git 可执行文件路径（默认 git，用绝对路径如 C:/Program Files/Git/bin/git.exe）
-  GIT_AUTO_PULL_RESTART_CMD=           # 自定义重启命令（如 systemctl restart bot；不设则用 os.execv）
+  GIT_AUTO_PULL_RESTART_CMD=           # 自定义重启命令（如 systemctl restart bot；仅在 FORCE_EXIT=true 时生效）
+  GIT_AUTO_PULL_FORCE_EXIT=false       # 是否主动退出进程（默认 false：交给 NoneBot 自动重载；true：拉取成功后强制退出，由 restart_cmd/进程管理器接管）
   GIT_AUTO_PULL_BRANCH=                # 目标分支（留空则自动检测当前分支）
 """
 
@@ -89,6 +90,7 @@ def getConfig() -> dict[str, Any]:
     remote = _readDotenv("GIT_AUTO_PULL_REMOTE") or "origin"
     git_path = _readDotenv("GIT_AUTO_PULL_GIT_PATH") or "git"
     restart_cmd = _readDotenv("GIT_AUTO_PULL_RESTART_CMD") or ""
+    force_exit = _readDotenv("GIT_AUTO_PULL_FORCE_EXIT") in ("true", "1", "yes")
     branch = _readDotenv("GIT_AUTO_PULL_BRANCH") or ""
 
     try:
@@ -108,6 +110,7 @@ def getConfig() -> dict[str, Any]:
         "remote": remote,
         "git_path": git_path,
         "restart_cmd": restart_cmd,
+        "force_exit": force_exit,
         "branch": branch,
     }
 
@@ -250,19 +253,33 @@ def _restartViaCommand(cmd: str) -> None:
 
 
 def restartBot() -> None:
-    """根据配置选择重启方式。
+    """决定是否主动退出进程以加载更新。
+
+    GIT_AUTO_PULL_FORCE_EXIT=false（默认）：
+        不退出。NoneBot 的自动重载（nb run 默认开启）会检测到
+        git pull 后的代码文件变化并优雅重启，本函数只打日志。
+
+    GIT_AUTO_PULL_FORCE_EXIT=true：
+        主动退出。配置了 GIT_AUTO_PULL_RESTART_CMD 时先拉起外部重启命令；
+        否则 Windows 直接 os._exit(0)，Linux 尝试 os.execv 原地替换。
 
     注意：必须在所有响应消息发送完成（await 返回）后调用，
-    本函数是同步退出，不会等待事件循环中未完成的任务。
+    本函数退出时不会等待事件循环中未完成的任务。
     """
     cfg = getConfig()
+
+    if not cfg["force_exit"]:
+        logger.info("GIT_AUTO_PULL_FORCE_EXIT=false，不主动退出，等待 NoneBot 自动重载")
+        return
+
     cmd = cfg.get("restart_cmd", "").strip()
     if cmd:
         _restartViaCommand(cmd)
         return
+
     if os.name == "nt":
-        # Windows 没有 POSIX exec，os.execv 会有不可靠的副作用；
-        # 直接干净退出，由手动 `nb run` / 进程管理器 / 启动脚本接管。
+        # Windows 没有 POSIX exec，直接干净退出，
+        # 由进程管理器 / 启动脚本接管拉起。
         logger.info("Windows 环境且未配置 GIT_AUTO_PULL_RESTART_CMD，直接退出进程")
         os._exit(0)
     try:
@@ -399,8 +416,13 @@ async def handleUpdate(bot, event):
         writeUpdateLock(old_head=old_head, trigger_group_id=group_id)
 
         # 发送成功消息（await 返回即消息已送达），再清理表情、缓冲后退出
+        cfg = getConfig()
+        if cfg["force_exit"]:
+            notice = "⚠️ 正在退出进程以加载更新，完成后会在此群收到通知"
+        else:
+            notice = "✅ 已拉取新代码，NoneBot 将自动重载，生效后在此群收到通知"
         await update_cmd.send(
-            f"🔄 {msg}\n\n⚠️ 正在重启以加载更新，完成后会在此群收到通知",
+            f"🔄 {msg}\n\n{notice}",
             at_sender=False,
         )
         if cleanup:
@@ -408,7 +430,7 @@ async def handleUpdate(bot, event):
         # 给消息 / 表情移除的发送留出缓冲，避免同步退出时截断
         await asyncio.sleep(1)
 
-        logger.info("更新拉取完成，即将退出进程以加载新代码")
+        logger.info("更新拉取完成，进入收尾（force_exit=%s）", cfg["force_exit"])
         restartBot()
     except FinishedException:
         # finish() 正常结束事件处理，交给 NoneBot，不作异常处理
@@ -437,8 +459,11 @@ async def scheduledPull():
         has_update, msg = gitPull(remote, branch, force=False)
 
         if has_update:
-            full_msg = f"🔄 自动更新: {msg}\n\n⚠️ 正在重启以加载更新"
-            logger.info("定时拉取到更新，即将重启")
+            if cfg["force_exit"]:
+                full_msg = f"🔄 自动更新: {msg}\n\n⚠️ 正在退出进程以加载更新"
+            else:
+                full_msg = f"🔄 自动更新: {msg}\n\n✅ 已拉取新代码，NoneBot 自动重载后生效"
+            logger.info("定时拉取到更新（force_exit=%s）", cfg["force_exit"])
             # 先落盘更新标记，重启后 onBotConnect 会补发完成通知
             notify_group = cfg["notify_group"].strip()
             writeUpdateLock(

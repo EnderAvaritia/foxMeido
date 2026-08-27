@@ -256,7 +256,9 @@ python scripts/fix_curator_db.py
 
 定时或手动执行 `git pull`，检测到新提交后自动重启机器人以加载新代码。
 
-> **更新流程（v2 修复版）：** 检测到更新后，机器人会先把更新状态写入项目根目录的 `.lock` 标记文件，再发送「🔄 正在重启」提示，**确保响应消息送达后才退出进程**（不再使用定时强杀）。重启后重新连接机器人时，若发现 `.lock` 存在，会自动向触发群补发「✅ 更新完成 + 本次提交列表」。Windows 下若未配置 `GIT_AUTO_PULL_RESTART_CMD`，进程将直接退出，需要手动 `nb run` 或由进程管理器/启动脚本拉起。
+> **更新流程：** 检测到更新后，机器人先把更新状态写入项目根目录的 `.lock` 标记文件，再发送「🔄 更新成功」提示（确保消息送达）。默认**不主动退出进程** —— `nb run` 自带自动重载（reload），检测到代码文件变化后会优雅重启并加载新代码；重启完成后自动补发「✅ 更新完成 + 本次提交列表」。
+>
+> 若以 `--no-reload` 运行或部署在生产环境（进程管理器托管），请设置 `GIT_AUTO_PULL_FORCE_EXIT=true`：拉取成功后会主动退出进程，由 `GIT_AUTO_PULL_RESTART_CMD` / 进程管理器 / 启动脚本接管拉起。
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
@@ -267,7 +269,8 @@ python scripts/fix_curator_db.py
 | `GIT_AUTO_PULL_NOTIFY_GROUP` | — | 拉取结果通知的目标群号（可选） |
 | `GIT_AUTO_PULL_REMOTE` | `origin` | 远程仓库名或 URL（如 `origin` 或 `https://github.com/user/repo.git`） |
 | `GIT_AUTO_PULL_GIT_PATH` | `git` | git 可执行文件路径（绝对路径或仅文件名） |
-| `GIT_AUTO_PULL_RESTART_CMD` | — | 自定义重启命令（如 `systemctl restart foxmeido`；**Windows 推荐配置**，如启动脚本路径；不设则 Linux 用 `os.execv` 原地替换、Windows 直接退出） |
+| `GIT_AUTO_PULL_RESTART_CMD` | — | 自定义重启命令（仅在 `FORCE_EXIT=true` 时生效；如 `systemctl restart foxmeido`） |
+| `GIT_AUTO_PULL_FORCE_EXIT` | `false` | 是否主动退出进程。默认 `false`：交给 NoneBot 自动重载；`true`：主动退出，由 `RESTART_CMD` / 进程管理器接管 |
 | `GIT_AUTO_PULL_BRANCH` | — | 目标分支（留空自动检测当前分支） |
 
 ## Steam Store API 参考
