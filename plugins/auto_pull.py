@@ -22,19 +22,22 @@ auto_pull.py - 自动拉取仓库更新插件
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
-from nonebot import require, get_bot
+from nonebot import require, get_bot, get_driver
+from nonebot.exception import FinishedException
 from nonebot.log import logger
 from nonebot.plugin import on_command
 
-from plugins.message_reaction import reaction_cleanup
+from plugins.message_reaction import reaction_cleanup, extract_group_id
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler  # noqa: E402
@@ -226,7 +229,7 @@ def gitPull(remote: str, branch: str, force: bool = False) -> tuple[bool, str]:
 
 # ── 机器人重启 ────────────────────────────────────────────────────
 def _restartViaExecv() -> None:
-    """方式 A：os.execv 替换当前进程（Linux 上工作良好，Windows 不推荐）。"""
+    """方式 A：os.execv 原地替换当前进程（仅 Linux，Windows 上不可靠）。"""
     logger.info("通过 os.execv 重启...")
     args = [sys.executable, "-m", "nb_cli", "run"]
     os.execv(sys.executable, args)
@@ -247,24 +250,88 @@ def _restartViaCommand(cmd: str) -> None:
 
 
 def restartBot() -> None:
-    """根据配置选择重启方式。"""
+    """根据配置选择重启方式。
+
+    注意：必须在所有响应消息发送完成（await 返回）后调用，
+    本函数是同步退出，不会等待事件循环中未完成的任务。
+    """
     cfg = getConfig()
     cmd = cfg.get("restart_cmd", "").strip()
     if cmd:
         _restartViaCommand(cmd)
-    else:
-        try:
-            _restartViaExecv()
-        except Exception as e:
-            logger.error("os.execv 重启失败，退出进程: %s", e)
-            os._exit(1)
+        return
+    if os.name == "nt":
+        # Windows 没有 POSIX exec，os.execv 会有不可靠的副作用；
+        # 直接干净退出，由手动 `nb run` / 进程管理器 / 启动脚本接管。
+        logger.info("Windows 环境且未配置 GIT_AUTO_PULL_RESTART_CMD，直接退出进程")
+        os._exit(0)
+    try:
+        _restartViaExecv()
+    except Exception as e:
+        logger.error("os.execv 重启失败，退出进程: %s", e)
+        os._exit(1)
 
 
-async def restartWithDelay(delay: int = 3) -> None:
-    """延迟后重启机器人，确保响应消息发送完毕。"""
-    logger.info("将在 %d 秒后重启...", delay)
-    await asyncio.sleep(delay)
-    restartBot()
+# ── 更新状态恢复（.lock）────────────────────────────────────────
+def getCurrentHead() -> str:
+    """获取当前 HEAD commit 完整哈希。"""
+    stdout, _, rc = _git("rev-parse", "HEAD")
+    return stdout if rc == 0 else ""
+
+
+def getCommitLog(old_head: str, new_head: str, limit: int = 10) -> str:
+    """列出 old_head..new_head 之间的提交（用于更新完成通知）。"""
+    if not old_head or not new_head or old_head == new_head:
+        return "（无新增提交）"
+    stdout, _, rc = _git(
+        "log", f"{old_head}..{new_head}", "--oneline", "--no-decorate",
+        f"-{limit}",
+    )
+    if rc != 0 or not stdout:
+        return "（无法获取提交记录）"
+    lines = [f"  • {c}" for c in stdout.splitlines()]
+    return "新提交：\n" + "\n".join(lines)
+
+
+def writeUpdateLock(old_head: str, trigger_group_id: int | None) -> None:
+    """在退出前把更新状态落盘，重启后 on_bot_connect 会补发通知。"""
+    payload = {
+        "start_time": time.time(),
+        "old_head": old_head,
+        "trigger_group_id": trigger_group_id,
+    }
+    lock_path = BASE_DIR / ".lock"
+    try:
+        lock_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        logger.info("已写入 .lock 更新标记 (old_head=%s)", old_head)
+    except OSError as e:
+        logger.error("写入 .lock 失败: %s", e)
+
+
+@get_driver().on_bot_connect
+async def onBotConnect() -> None:
+    """机器人连接成功后：若存在 .lock 说明上次更新触发了退出，补发完成通知。"""
+    lock_path = BASE_DIR / ".lock"
+    if not lock_path.is_file():
+        return
+    try:
+        payload = json.loads(lock_path.read_text(encoding="utf-8"))
+        lock_path.unlink(missing_ok=True)
+        start_time = float(payload.get("start_time") or 0)
+        old_head = str(payload.get("old_head") or "")
+        group_id = payload.get("trigger_group_id")
+
+        elapsed = int(time.time() - start_time) if start_time else 0
+        commits = getCommitLog(old_head, getCurrentHead())
+        message = f"✅ 更新完成！用时 {elapsed} 秒\n{commits}"
+
+        if group_id:
+            await sendToGroup(str(group_id), message)
+        else:
+            logger.info("更新完成，但无触发群信息，未发送通知: %s", message)
+    except Exception as e:
+        # 恢复失败不能影响 bot 正常运行
+        logger.warning("发送更新完成通知失败: %s", e)
 
 
 # ── 消息发送 ──────────────────────────────────────────────────────
@@ -286,28 +353,19 @@ async def sendNotification(message: str) -> None:
 
 
 # ── 核心检查逻辑 ──────────────────────────────────────────────────
-async def runPull(force: bool = False) -> str:
+async def runPull(force: bool = False) -> tuple[bool, str]:
     """
     执行一次完整的 pull 检查流程。
 
     Returns:
-        给用户的消息文本。
+        (是否有更新, 给用户的消息文本)。调用方负责在消息发送完成后触发重启。
     """
     cfg = getConfig()
     remote = cfg["remote"]
     branch = cfg["branch"] or getCurrentBranch() or "main"
 
     logger.info("检查仓库更新 (remote=%s, branch=%s, force=%s)", remote, branch, force)
-    has_update, msg = gitPull(remote, branch, force=force)
-
-    if has_update:
-        # 异步触发延迟重启
-        asyncio.ensure_future(restartWithDelay(delay=3))
-        result = f"🔄 {msg}\n\n⚠️ 机器人将在 3 秒后自动重启以加载更新"
-    else:
-        result = f"✅ {msg}"
-
-    return result
+    return gitPull(remote, branch, force=force)
 
 
 # ── 命令 ──────────────────────────────────────────────────────────
@@ -325,9 +383,36 @@ async def handleUpdate(bot, event):
     force = len(args) > 1 and args[1] == "force"
 
     try:
-        msg = await runPull(force=force)
+        old_head = getCurrentHead()
+        has_update, msg = await runPull(force=force)
+
+        if not has_update:
+            result = f"✅ {msg}"
+            if cleanup:
+                await cleanup()
+            await update_cmd.finish(result, at_sender=False)
+            return
+
+        # 先落盘更新标记：重启后 onBotConnect 会据此补发完成通知，
+        # 避免“消息发一半进程被强杀 / 重启后无任何反馈”。
+        group_id = extract_group_id(event)
+        writeUpdateLock(old_head=old_head, trigger_group_id=group_id)
+
+        # 发送成功消息（await 返回即消息已送达），再清理表情、缓冲后退出
+        await update_cmd.send(
+            f"🔄 {msg}\n\n⚠️ 正在重启以加载更新，完成后会在此群收到通知",
+            at_sender=False,
+        )
         if cleanup:
             await cleanup()
+        # 给消息 / 表情移除的发送留出缓冲，避免同步退出时截断
+        await asyncio.sleep(1)
+
+        logger.info("更新拉取完成，即将退出进程以加载新代码")
+        restartBot()
+    except FinishedException:
+        # finish() 正常结束事件处理，交给 NoneBot，不作异常处理
+        raise
     except Exception as e:
         logger.exception("update 命令异常")
         if cleanup:
@@ -339,7 +424,7 @@ async def handleUpdate(bot, event):
 
 # ── 定时任务 ──────────────────────────────────────────────────────
 async def scheduledPull():
-    """定时任务：检查更新并推送通知。"""
+    """定时任务：检查更新，有更新则通知并重启。"""
     cfg = getConfig()
     if not cfg["enabled"]:
         return
@@ -348,15 +433,22 @@ async def scheduledPull():
     try:
         remote = cfg["remote"]
         branch = cfg["branch"] or getCurrentBranch() or "main"
+        old_head = getCurrentHead()
         has_update, msg = gitPull(remote, branch, force=False)
 
         if has_update:
-            full_msg = f"🔄 自动更新: {msg}\n\n⚠️ 机器人将在 3 秒后重启"
+            full_msg = f"🔄 自动更新: {msg}\n\n⚠️ 正在重启以加载更新"
             logger.info("定时拉取到更新，即将重启")
-            # 通知群（如配置）
+            # 先落盘更新标记，重启后 onBotConnect 会补发完成通知
+            notify_group = cfg["notify_group"].strip()
+            writeUpdateLock(
+                old_head=old_head,
+                trigger_group_id=int(notify_group) if notify_group.isdigit() else None,
+            )
+            # 通知必须先 await 完成，再退出进程，避免消息被截断
             await sendNotification(full_msg)
-            # 重启
-            await restartWithDelay(delay=3)
+            await asyncio.sleep(1)
+            restartBot()
         else:
             logger.info("定时拉取检查完成: %s", msg)
     except Exception as e:

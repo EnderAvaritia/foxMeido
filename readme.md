@@ -256,6 +256,8 @@ python scripts/fix_curator_db.py
 
 定时或手动执行 `git pull`，检测到新提交后自动重启机器人以加载新代码。
 
+> **更新流程（v2 修复版）：** 检测到更新后，机器人会先把更新状态写入项目根目录的 `.lock` 标记文件，再发送「🔄 正在重启」提示，**确保响应消息送达后才退出进程**（不再使用定时强杀）。重启后重新连接机器人时，若发现 `.lock` 存在，会自动向触发群补发「✅ 更新完成 + 本次提交列表」。Windows 下若未配置 `GIT_AUTO_PULL_RESTART_CMD`，进程将直接退出，需要手动 `nb run` 或由进程管理器/启动脚本拉起。
+
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `GIT_AUTO_PULL_ENABLED` | `false` | 是否启用自动检查 |
@@ -265,8 +267,8 @@ python scripts/fix_curator_db.py
 | `GIT_AUTO_PULL_NOTIFY_GROUP` | — | 拉取结果通知的目标群号（可选） |
 | `GIT_AUTO_PULL_REMOTE` | `origin` | 远程仓库名或 URL（如 `origin` 或 `https://github.com/user/repo.git`） |
 | `GIT_AUTO_PULL_GIT_PATH` | `git` | git 可执行文件路径（绝对路径或仅文件名） |
-| `GIT_AUTO_PULL_RESTART_CMD` | — | 自定义重启命令（如 `systemctl restart foxmeido`；不设则用 `os.execv` 原地替换） |
- | `GIT_AUTO_PULL_BRANCH` | — | 目标分支（留空自动检测当前分支）
+| `GIT_AUTO_PULL_RESTART_CMD` | — | 自定义重启命令（如 `systemctl restart foxmeido`；**Windows 推荐配置**，如启动脚本路径；不设则 Linux 用 `os.execv` 原地替换、Windows 直接退出） |
+| `GIT_AUTO_PULL_BRANCH` | — | 目标分支（留空自动检测当前分支） |
 
 ## Steam Store API 参考
 

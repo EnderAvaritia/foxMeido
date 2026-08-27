@@ -6,6 +6,7 @@ tmp/
 plugins/weather.py
 logs/
 log/
+.lock
 data/cookies/*.json
 data/db/
 data/azurlane/
