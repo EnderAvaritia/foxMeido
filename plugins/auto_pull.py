@@ -116,17 +116,39 @@ def getConfig() -> dict[str, Any]:
 
 
 # ── Git 操作 ──────────────────────────────────────────────────────
+def _decodeBytes(data: bytes) -> str:
+    """解码 git 进程输出，避免 Windows GBK 编码崩溃。
+
+    Windows 中文环境下 git 可能按 GBK(cp936) 输出文本（如含中文的
+    提交信息、分支名），直接按 UTF-8 严格解码会抛 UnicodeDecodeError
+    （它继承自 ValueError，现有的 except OSError 捕获不到，会导致
+    命令处理崩溃）。这里依次尝试 UTF-8 → GBK，最后用
+    errors='replace' 兜底，保证任何字节序列都不会抛异常。
+    """
+    if not data:
+        return ""
+    for enc in ("utf-8", "gbk"):
+        try:
+            return data.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("utf-8", errors="replace")
+
+
 def _git(*args: str, timeout: int = 60) -> tuple[str, str, int]:
     """执行 git 命令，返回 (stdout, stderr, returncode)。"""
     try:
         result = subprocess.run(
             [_GIT_EXECUTABLE] + list(args),
             capture_output=True,
-            encoding='utf-8',
             cwd=str(BASE_DIR),
             timeout=timeout,
         )
-        return result.stdout.strip(), result.stderr.strip(), result.returncode
+        return (
+            _decodeBytes(result.stdout).strip(),
+            _decodeBytes(result.stderr).strip(),
+            result.returncode,
+        )
     except subprocess.TimeoutExpired:
         return "", "git 命令超时", -1
     except FileNotFoundError:
