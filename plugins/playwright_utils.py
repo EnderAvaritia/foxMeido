@@ -138,7 +138,7 @@ async def load_cookie_file(context) -> None:
         return
     fpath = os.path.join(_project_root(), cookie_file)
     if not os.path.isfile(fpath):
-        log_error("load_cookie_file", f"Cookie 文件不存在: {fpath}")
+        log_error("load_cookie_file", f"Cookie 文件不存在: {fpath}", exc_info=False)
         return
     try:
         with open(fpath, "r", encoding="utf-8") as f:
@@ -208,7 +208,7 @@ async def _load_cookie_from_file(context, rel_path: str) -> None:
     """从指定相对路径加载 cookie JSON 到 context。"""
     fpath = os.path.join(_project_root(), rel_path)
     if not os.path.isfile(fpath):
-        log_error("_load_cookie_from_file", f"Cookie 文件不存在: {fpath}")
+        log_error("_load_cookie_from_file", f"Cookie 文件不存在: {fpath}", exc_info=False)
         return
     try:
         with open(fpath, "r", encoding="utf-8") as f:

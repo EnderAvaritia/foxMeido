@@ -3,6 +3,7 @@ import re
 import base64
 
 from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
+from nonebot.adapters.onebot.v11.exception import ActionFailed
 
 from nonebot import on_startswith
 
@@ -37,10 +38,32 @@ async def send_message(goodId):
     if goodId != [] and goodId != "":
         result = await get_message(goodId)
         if result:
-            await steamGoods.send(message=result, at_sender=False)
+            await send_with_fallback(result)
     else:
         print("no_match")
         await steamGoods.send(f"你确定\"{display_input}\"是商品的id？")
+
+
+async def send_with_fallback(result):
+    """发送结果消息：发图失败（rich media transfer failed 等）先重试一次，
+    仍失败则去掉图片段降级为纯文本发送，避免整条消息丢失。"""
+    try:
+        await steamGoods.send(message=result, at_sender=False)
+        return
+    except ActionFailed as e:
+        print(f"[steamFinderAuto] 发送失败，重试一次: {e}")
+        await asyncio.sleep(2)
+        try:
+            await steamGoods.send(message=result, at_sender=False)
+            return
+        except ActionFailed as e2:
+            print(f"[steamFinderAuto] 重试仍失败，降级为纯文本: {e2}")
+
+    # 降级：剔除图片段，仅发送文本
+    if hasattr(result, "extract_plain_text"):
+        plain = result.extract_plain_text().strip()
+        if plain:
+            await steamGoods.send(message=plain, at_sender=False)
 
 
 async def get_message(goodId):
@@ -100,7 +123,7 @@ async def get_message(goodId):
     if pic_data:
         pic = MessageSegment.image(f"base64://{base64.b64encode(pic_data).decode()}")
     else:
-        pic = '截图超时，请联系'
+        pic = '\n（截图获取失败，请点链接查看）'
     
     # 条件构建输出行，缺失信息不输出对应行
     lines = []
