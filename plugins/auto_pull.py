@@ -184,7 +184,7 @@ def gitFetch(remote: str, branch: str) -> bool:
     """git fetch 远程（支持 remote 名称或 URL），返回是否成功。"""
     stdout, stderr, rc = _git("fetch", remote, branch)
     if rc != 0:
-        logger.warning("git fetch 失败: %s", stderr)
+        logger.warning("git fetch 失败: {}", stderr)
         return False
     return True
 
@@ -269,12 +269,12 @@ def _restartViaCommand(cmd: str) -> None:
     """方式 B：执行自定义命令后退出当前进程。"""
     import shlex
 
-    logger.info("通过自定义命令重启: %s", cmd)
+    logger.info("通过自定义命令重启: {}", cmd)
     try:
         parts = shlex.split(cmd)
         subprocess.Popen(parts, shell=False)
     except Exception as e:
-        logger.error("自定义重启命令失败: %s", e)
+        logger.error("自定义重启命令失败: {}", e)
     # 无论如何都退出，让进程管理器或新进程接管
     os._exit(0)
 
@@ -312,7 +312,7 @@ def restartBot() -> None:
     try:
         _restartViaExecv()
     except Exception as e:
-        logger.error("os.execv 重启失败，退出进程: %s", e)
+        logger.error("os.execv 重启失败，退出进程: {}", e)
         os._exit(1)
 
 
@@ -337,19 +337,32 @@ def getCommitLog(old_head: str, new_head: str, limit: int = 10) -> str:
     return "新提交：\n" + "\n".join(lines)
 
 
-def writeUpdateLock(old_head: str, trigger_group_id: int | None) -> None:
-    """在退出前把更新状态落盘，重启后 on_bot_connect 会补发通知。"""
+def writeUpdateLock(
+    old_head: str,
+    trigger_group_id: int | None,
+    trigger_user_id: int | None = None,
+) -> None:
+    """在退出前把更新状态落盘，重启后 on_bot_connect 会补发通知。
+
+    trigger_group_id / trigger_user_id 记录触发来源：群聊触发记群号，
+    私聊触发记用户 QQ，重启后据此补发更新完成通知，保证触发者一定能
+    收到结果。
+    """
     payload = {
         "start_time": time.time(),
         "old_head": old_head,
         "trigger_group_id": trigger_group_id,
+        "trigger_user_id": trigger_user_id,
     }
     lock_path = BASE_DIR / ".lock"
     try:
         lock_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-        logger.info("已写入 .lock 更新标记 (old_head=%s)", old_head)
+        logger.info(
+            "已写入 .lock 更新标记 (old_head={}, group={}, user={})",
+            old_head, trigger_group_id, trigger_user_id,
+        )
     except OSError as e:
-        logger.error("写入 .lock 失败: %s", e)
+        logger.error("写入 .lock 失败: {}", e)
 
 
 @get_driver().on_bot_connect
@@ -364,6 +377,7 @@ async def onBotConnect() -> None:
         start_time = float(payload.get("start_time") or 0)
         old_head = str(payload.get("old_head") or "")
         group_id = payload.get("trigger_group_id")
+        user_id = payload.get("trigger_user_id")
 
         elapsed = int(time.time() - start_time) if start_time else 0
         commits = getCommitLog(old_head, getCurrentHead())
@@ -371,11 +385,13 @@ async def onBotConnect() -> None:
 
         if group_id:
             await sendToGroup(str(group_id), message)
+        elif user_id:
+            await sendToUser(str(user_id), message)
         else:
-            logger.info("更新完成，但无触发群信息，未发送通知: %s", message)
+            logger.info("更新完成，但无触发群/用户信息，未发送通知: {}", message)
     except Exception as e:
         # 恢复失败不能影响 bot 正常运行
-        logger.warning("发送更新完成通知失败: %s", e)
+        logger.warning("发送更新完成通知失败: {}", e)
 
 
 # ── 消息发送 ──────────────────────────────────────────────────────
@@ -388,7 +404,7 @@ async def _safeCleanup(cleanup: Any | None) -> None:
     except (asyncio.TimeoutError, TimeoutError):
         logger.warning("移除表情回应超时（连接可能在重载中被关闭）")
     except Exception as e:
-        logger.warning("移除表情回应失败: %s", e)
+        logger.warning("移除表情回应失败: {}", e)
 
 
 async def _safeSend(matcher, message: str, **kwargs) -> bool:
@@ -407,7 +423,7 @@ async def _safeSend(matcher, message: str, **kwargs) -> bool:
         logger.warning("发送消息超时（连接可能在重载中被关闭）")
         return False
     except Exception as e:
-        logger.warning("发送消息失败: %s", e)
+        logger.warning("发送消息失败: {}", e)
         return False
 
 
@@ -424,7 +440,7 @@ async def _safeFinish(matcher, message: str, **kwargs) -> None:
     except (asyncio.TimeoutError, TimeoutError):
         logger.warning("发送最终消息超时（连接可能在重载中被关闭）")
     except Exception as e:
-        logger.warning("发送最终消息失败: %s", e)
+        logger.warning("发送最终消息失败: {}", e)
 
 
 async def sendToGroup(group_id: str, message: str) -> None:
@@ -436,9 +452,23 @@ async def sendToGroup(group_id: str, message: str) -> None:
             timeout=SEND_TIMEOUT,
         )
     except (asyncio.TimeoutError, TimeoutError):
-        logger.warning("发送群消息超时 (group=%s): 连接可能在重载中被关闭", group_id)
+        logger.warning("发送群消息超时 (group={}): 连接可能在重载中被关闭", group_id)
     except Exception as e:
-        logger.error("发送群消息失败 (group=%s): %s", group_id, e)
+        logger.error("发送群消息失败 (group={}): {}", group_id, e)
+
+
+async def sendToUser(user_id: str, message: str) -> None:
+    """向指定 QQ 用户私聊发送消息。"""
+    try:
+        bot = get_bot()
+        await asyncio.wait_for(
+            bot.call_api("send_private_msg", user_id=int(user_id), message=message),
+            timeout=SEND_TIMEOUT,
+        )
+    except (asyncio.TimeoutError, TimeoutError):
+        logger.warning("发送私聊消息超时 (user={}): 连接可能在重载中被关闭", user_id)
+    except Exception as e:
+        logger.error("发送私聊消息失败 (user={}): {}", user_id, e)
 
 
 async def sendNotification(message: str) -> None:
@@ -461,7 +491,7 @@ async def runPull(force: bool = False) -> tuple[bool, str]:
     remote = cfg["remote"]
     branch = cfg["branch"] or getCurrentBranch() or "main"
 
-    logger.info("检查仓库更新 (remote=%s, branch=%s, force=%s)", remote, branch, force)
+    logger.info("检查仓库更新 (remote={}, branch={}, force={})", remote, branch, force)
     return gitPull(remote, branch, force=force)
 
 
@@ -492,7 +522,12 @@ async def handleUpdate(bot, event):
         # 先落盘更新标记：重启后 onBotConnect 会据此补发完成通知，
         # 避免“消息发一半进程被强杀 / 重启后无任何反馈”。
         group_id = extract_group_id(event)
-        writeUpdateLock(old_head=old_head, trigger_group_id=group_id)
+        user_id = getattr(event, "user_id", None)
+        writeUpdateLock(
+            old_head=old_head,
+            trigger_group_id=group_id,
+            trigger_user_id=user_id,
+        )
 
         # 发送成功消息，再清理表情、缓冲后退出
         cfg = getConfig()
@@ -517,7 +552,7 @@ async def handleUpdate(bot, event):
         # 给消息 / 表情移除的发送留出缓冲，避免同步退出时截断
         await asyncio.sleep(1)
 
-        logger.info("更新拉取完成，进入收尾（force_exit=%s）", cfg["force_exit"])
+        logger.info("更新拉取完成，进入收尾（force_exit={}）", cfg["force_exit"])
         restartBot()
         # restartBot() 在 GIT_AUTO_PULL_FORCE_EXIT=false 时不退出，直接返回；
         # 完成消息已由上方 _safeSend 发出，无需再 finish 一次造成重复消息。
@@ -550,7 +585,7 @@ async def scheduledPull():
                 full_msg = f"🔄 自动更新: {msg}\n\n⚠️ 正在退出进程以加载更新"
             else:
                 full_msg = f"🔄 自动更新: {msg}\n\n✅ 已拉取新代码，NoneBot 自动重载后生效"
-            logger.info("定时拉取到更新（force_exit=%s）", cfg["force_exit"])
+            logger.info("定时拉取到更新（force_exit={}）", cfg["force_exit"])
             # 先落盘更新标记，重启后 onBotConnect 会补发完成通知
             notify_group = cfg["notify_group"].strip()
             writeUpdateLock(
@@ -562,9 +597,9 @@ async def scheduledPull():
             await asyncio.sleep(1)
             restartBot()
         else:
-            logger.info("定时拉取检查完成: %s", msg)
+            logger.info("定时拉取检查完成: {}", msg)
     except Exception as e:
-        logger.exception("定时拉取检查异常: %s", e)
+        logger.exception("定时拉取检查异常: {}", e)
         await sendNotification(f"❌ 自动拉取检查异常: {e}")
 
 
@@ -588,7 +623,7 @@ if _cfg["enabled"]:
     _branch = _cfg["branch"] or getCurrentBranch() or "main"
 
     logger.info(
-        "自动拉取已启用: schedule=%s, interval=%dmin, time=%s, branch=%s",
+        "自动拉取已启用: schedule={}, interval={}min, time={}, branch={}",
         _schedule_type, _cfg["interval"], _cfg["check_time"], _branch,
     )
 
@@ -604,7 +639,7 @@ if _cfg["enabled"]:
             replace_existing=True,
             misfire_grace_time=300,
         )
-        logger.info("定时拉取已注册: 每天 %02d:%02d", _hour, _minute)
+        logger.info("定时拉取已注册: 每天 {:02d}:{:02d}", _hour, _minute)
 
     # 间隔模式（每 N 分钟）
     if _schedule_type in ("interval", "both"):
@@ -616,7 +651,7 @@ if _cfg["enabled"]:
             replace_existing=True,
             misfire_grace_time=120,
         )
-        logger.info("间隔拉取已注册: 每 %d 分钟", _cfg["interval"])
+        logger.info("间隔拉取已注册: 每 {} 分钟", _cfg["interval"])
 
 else:
     logger.info("自动拉取未启用（GIT_AUTO_PULL_ENABLED=false），仅支持手动 update 命令")
