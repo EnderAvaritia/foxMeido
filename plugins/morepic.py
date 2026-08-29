@@ -37,7 +37,9 @@ async def handle_function(bot, event, args: Message = CommandArg()):
             await morepic.finish(f"游戏{appid}未获取到截图，请反馈")
 
         msg = Message()
-        for url in screenshots:
+        for i, url in enumerate(screenshots):
+            if i > 0:
+                msg += MessageSegment.text("\n")
             msg += MessageSegment.image(url)
         await morepic.send(message=msg, at_sender=False)
     finally:
