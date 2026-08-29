@@ -285,11 +285,23 @@ Steam 非官方 API `store.steampowered.com/api/appdetails` 的参数说明、�
 | `morepic <appid/url>` | `更多截图` | 发送游戏全部截图缩略图（Steam API screenshots.path_thumbnail） |
 | `pub <publisher>` | `steamPublishers` | 查询发行商页面截图 |
 | `find <关键字>` | `搜索steam游戏` | 交互式搜索 Steam 游戏，搜索结果选编号后显示详情（名称、类型、热门标签、语言、日期、发行商、价格、截图） |
+| `pending` | — | 鉴赏家副本监控，手动触发检查 |
 | `cs [最低价] [日销量]` | — | CS2 挂刀行情表 |
 | `dota [最低价] [日销量]` | — | Dota2 挂刀行情表 |
-| `pending` | — | 鉴赏家副本监控，手动触发检查 |
+| `bind` | — | 将 Steam ID 绑定到 QQ 账号 |
+| `get <游戏ID> [用户ID]` | — | 登记游戏领取记录（可代他人登记） |
+| `remain <游戏ID> [份数]` | — | 剩余份数登记 / 查询当前领取情况 |
+| `wish <游戏ID>` | — | 将游戏加入 Steam 愿望单 |
+| `report <游戏ID>` | — | 将指定游戏的记录标记为已报告 |
+| `probe` | — | 检测领取记录链接是否有效并更新提交时间 |
+| `unfinished` | — | 输出未完成（未提交评测）的记录 |
+| `unreported` | — | 输出未报告的游戏及用户 |
+| `queryWishlist <游戏ID>` | `queryWish` `qwish` | 查询愿望单记录 |
+| `calendar` | `cale` `愿望单` `冤枉单` `任务` | Steam 个人日历截图 |
+| `finder <url>` | — | 通用页面截图 |
 | `update` / `pull` | — | 手动触发 git pull，检测到更新后自动重启机器人 |
 | `update force` | — | 强制拉取（丢弃本地未提交更改）后重启 |
+| `ping` | — | 心跳测试 |
 | `help` | — | 显示帮助 |
 
 Steam 商店链接会自动触发查询（如发送 `https://store.steampowered.com/app/3251240`）。
