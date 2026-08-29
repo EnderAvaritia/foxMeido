@@ -48,6 +48,11 @@ from nonebot_plugin_apscheduler import scheduler  # noqa: E402
 BASE_DIR = Path(__file__).resolve().parent.parent
 CST = timezone(timedelta(hours=8))
 
+# 发送消息的超时上限（秒）。git pull 落盘新代码后，nb run 的自动重载
+# 可能已开始关闭与 OneBot 的连接，此时 API 调用会一直挂到适配器超时
+# （默认 30s）。这里统一用更短的上限，避免消息发送拖慢重载流程。
+SEND_TIMEOUT: float = 10.0
+
 # 在 getConfig() 后由模块初始化时更新
 _GIT_EXECUTABLE: str = "git"
 
@@ -374,11 +379,64 @@ async def onBotConnect() -> None:
 
 
 # ── 消息发送 ──────────────────────────────────────────────────────
+async def _safeCleanup(cleanup: Any | None) -> None:
+    """移除表情回应；连接正在关闭时静默失败（仅记日志）。"""
+    if not cleanup:
+        return
+    try:
+        await asyncio.wait_for(cleanup(), timeout=SEND_TIMEOUT)
+    except (asyncio.TimeoutError, TimeoutError):
+        logger.warning("移除表情回应超时（连接可能在重载中被关闭）")
+    except Exception as e:
+        logger.warning("移除表情回应失败: %s", e)
+
+
+async def _safeSend(matcher, message: str, **kwargs) -> bool:
+    """发送消息，失败时只记日志并返回 False。
+
+    git pull 成功后新代码已落盘，NoneBot 自动重载可能正在关闭连接，
+    此时发送失败是**预期行为**——.lock 已落盘，重启后 onBotConnect
+    会补发完成通知，因此调用方不应把发送失败当作命令异常处理。
+    """
+    try:
+        await asyncio.wait_for(matcher.send(message, **kwargs), timeout=SEND_TIMEOUT)
+        return True
+    except FinishedException:
+        raise
+    except (asyncio.TimeoutError, TimeoutError):
+        logger.warning("发送消息超时（连接可能在重载中被关闭）")
+        return False
+    except Exception as e:
+        logger.warning("发送消息失败: %s", e)
+        return False
+
+
+async def _safeFinish(matcher, message: str, **kwargs) -> None:
+    """发送最终消息并结束事件处理；发送失败时只记日志，不再补发错误通知。
+
+    与 finish() 一致：发送成功后抛出 FinishedException 结束事件处理；
+    发送失败（连接已被重载关闭）时静默降级，避免留下无意义的报错堆栈。
+    """
+    try:
+        await matcher.finish(message, **kwargs)
+    except FinishedException:
+        raise
+    except (asyncio.TimeoutError, TimeoutError):
+        logger.warning("发送最终消息超时（连接可能在重载中被关闭）")
+    except Exception as e:
+        logger.warning("发送最终消息失败: %s", e)
+
+
 async def sendToGroup(group_id: str, message: str) -> None:
     """向指定 QQ 群发送消息。"""
     try:
         bot = get_bot()
-        await bot.call_api("send_group_msg", group_id=int(group_id), message=message)
+        await asyncio.wait_for(
+            bot.call_api("send_group_msg", group_id=int(group_id), message=message),
+            timeout=SEND_TIMEOUT,
+        )
+    except (asyncio.TimeoutError, TimeoutError):
+        logger.warning("发送群消息超时 (group=%s): 连接可能在重载中被关闭", group_id)
     except Exception as e:
         logger.error("发送群消息失败 (group=%s): %s", group_id, e)
 
@@ -427,9 +485,8 @@ async def handleUpdate(bot, event):
 
         if not has_update:
             result = f"✅ {msg}"
-            if cleanup:
-                await cleanup()
-            await update_cmd.finish(result, at_sender=False)
+            await _safeCleanup(cleanup)
+            await _safeFinish(update_cmd, result, at_sender=False)
             return
 
         # 先落盘更新标记：重启后 onBotConnect 会据此补发完成通知，
@@ -437,33 +494,41 @@ async def handleUpdate(bot, event):
         group_id = extract_group_id(event)
         writeUpdateLock(old_head=old_head, trigger_group_id=group_id)
 
-        # 发送成功消息（await 返回即消息已送达），再清理表情、缓冲后退出
+        # 发送成功消息，再清理表情、缓冲后退出
         cfg = getConfig()
         if cfg["force_exit"]:
             notice = "⚠️ 正在退出进程以加载更新，完成后会在此群收到通知"
         else:
             notice = "✅ 已拉取新代码，NoneBot 将自动重载，生效后在此群收到通知"
-        await update_cmd.send(
-            f"🔄 {msg}\n\n{notice}",
-            at_sender=False,
-        )
-        if cleanup:
-            await cleanup()
+        result = f"🔄 {msg}\n\n{notice}"
+
+        # 关键：git pull 把新代码落盘后，nb run 的自动重载可能已经/即将
+        # 关闭与 OneBot 的连接，此时发送失败是**预期行为**——.lock 已保证
+        # 重启后 onBotConnect 会补发完成通知。因此发送失败只记日志，绝不
+        # 走进 except 分支误报「命令异常」（否则错误通知本身也发不出去，
+        # 只会留下难看的双份堆栈并拖慢整个重载流程）。
+        sent = await _safeSend(update_cmd, result, at_sender=False)
+        if not sent:
+            logger.warning(
+                "更新通知未能送达（连接可能在重载中被关闭），"
+                "重启后 onBotConnect 将补发完成通知"
+            )
+        await _safeCleanup(cleanup)
         # 给消息 / 表情移除的发送留出缓冲，避免同步退出时截断
         await asyncio.sleep(1)
 
         logger.info("更新拉取完成，进入收尾（force_exit=%s）", cfg["force_exit"])
         restartBot()
+        # restartBot() 在 GIT_AUTO_PULL_FORCE_EXIT=false 时不退出，直接返回；
+        # 完成消息已由上方 _safeSend 发出，无需再 finish 一次造成重复消息。
     except FinishedException:
         # finish() 正常结束事件处理，交给 NoneBot，不作异常处理
         raise
     except Exception as e:
         logger.exception("update 命令异常")
-        if cleanup:
-            await cleanup()
-        await update_cmd.finish(f"❌ 命令异常: {e}", at_sender=False)
+        await _safeCleanup(cleanup)
+        await _safeFinish(update_cmd, f"❌ 命令异常: {e}", at_sender=False)
         return
-    await update_cmd.finish(msg, at_sender=False)
 
 
 # ── 定时任务 ──────────────────────────────────────────────────────
