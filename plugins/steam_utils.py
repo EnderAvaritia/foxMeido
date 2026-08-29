@@ -169,6 +169,31 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
     return result
 
 
+def get_game_screenshots(appid: int | str) -> list[str]:
+    """
+    通过 Steam Web API 获取游戏全部截图缩略图（path_thumbnail）URL 列表。
+
+    Args:
+        appid: Steam AppID。
+
+    Returns:
+        list[str]: 截图缩略图 URL 列表，无截图或出错时返回空列表。
+    """
+    try:
+        details = _fetch_app_data(appid)
+        if not details:
+            return []
+        screenshots = details.get("screenshots") or []
+        return [
+            s.get("path_thumbnail")
+            for s in screenshots
+            if s.get("path_thumbnail")
+        ]
+    except Exception as e:
+        log_error("steam_utils.get_game_screenshots", f"获取截图异常 (AppID: {appid}): {e}")
+        return []
+
+
 def extract_steam_id(text: str) -> str | None:
     """
     从文本中提取 Steam AppID。

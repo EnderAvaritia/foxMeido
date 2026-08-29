@@ -282,6 +282,7 @@ Steam 非官方 API `store.steampowered.com/api/appdetails` 的参数说明、�
 | 命令 | 别名 | 说明 |
 |------|------|------|
 | `id <appid/url>` | `steam` `查商店` `steamGoods` | 查询游戏详情（名称、类型、热门标签、厂商、发行日期、价格、截图） |
+| `morepic <appid/url>` | `更多截图` | 发送游戏全部截图缩略图（Steam API screenshots.path_thumbnail） |
 | `pub <publisher>` | `steamPublishers` | 查询发行商页面截图 |
 | `find <关键字>` | `搜索steam游戏` | 交互式搜索 Steam 游戏，搜索结果选编号后显示详情（名称、类型、热门标签、语言、日期、发行商、价格、截图） |
 | `cs [最低价] [日销量]` | — | CS2 挂刀行情表 |
