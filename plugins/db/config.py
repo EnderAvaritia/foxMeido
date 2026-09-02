@@ -22,12 +22,14 @@ noco 后端配置（仅 DB_BACKEND=noco 时生效）：
   HTTPS_PROXY          - HTTPS 代理地址（默认空 = 跟随 HTTP_PROXY）
   STEAM_COOKIE         - Steam 登录 Cookie（wish 用）
   STEAM_CC             - Steam 国家/地区码（steam_utils 用）
+  PRICE_REGIONS        - price 命令查询的区域列表（逗号/空格分隔，可多个）
   CURATOR_ID           - Steam 鉴赏家 ID（curator_monitor / unreported 用）
 """
 
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 
 from plugins.env_utils import _read_dotenv, get_http_proxy, get_proxies, _env_bool
@@ -111,6 +113,28 @@ if HTTP_PROXY:
 STEAM_COOKIE: str = _read_dotenv("STEAM_COOKIE") or ""
 STEAM_CC: str = _read_dotenv("STEAM_CC") or ""
 CURATOR_ID: int = int(_read_dotenv("CURATOR_ID") or "0")
+
+# price 命令查询价格的区域集合（PRICE_REGIONS，逗号/空格分隔，可多个）
+DEFAULT_PRICE_REGIONS: tuple[str, ...] = (
+    "cn", "us", "jp", "kr", "hk", "tw", "sg",
+    "gb", "de", "fr", "br", "au", "ca",
+)
+
+
+def _parse_price_regions() -> list[str]:
+    """解析 PRICE_REGIONS：支持逗号/空格/中文逗号分隔，去重保序，非法项忽略。"""
+    raw = _read_dotenv("PRICE_REGIONS")
+    if not raw:
+        return []
+    seen: list[str] = []
+    for part in re.split(r"[,，\s]+", raw.strip()):
+        cc = part.strip().lower()
+        if len(cc) == 2 and cc.isalpha() and cc not in seen:
+            seen.append(cc)
+    return seen
+
+
+PRICE_REGIONS: list[str] = _parse_price_regions() or list(DEFAULT_PRICE_REGIONS)
 
 
 # ── 便捷函数（noco 后端与迁移脚本使用） ─────────────────────

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 import urllib3
@@ -322,3 +323,178 @@ def _extract_from_app_tag_elements(html: str) -> list[str]:
             seen.add(name)
             tags.append(name)
     return tags
+
+
+# ── 多区域价格比价（price 命令用）────────────────────────────────
+
+# 匿名请求也附带这组 Cookie，绕过成人内容的年龄验证导致的价格缺失
+_AGE_GATE_COOKIE = "birthtime=1; lastagecheckage=1; wants_mature_content=1"
+
+# 汇率来源：open.er-api.com（免费，每日更新，基准 CNY）
+_CNY_RATES_URL = "https://open.er-api.com/v6/latest/CNY"
+
+
+def _fetch_region_price(appid: int | str, cc: str) -> dict[str, Any] | None:
+    """
+    请求指定区域（cc）的 appdetails，返回完整 data dict；失败/锁区返回 None。
+
+    不做登录态，仅带年龄 Cookie —— 保证 cc 参数决定货币，
+    不受 STEAM_COOKIE 账户所属区域干扰。
+    """
+    api_url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=schinese&cc={cc}"
+    request_kwargs: dict[str, Any] = {
+        "headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36",
+            "Cookie": _AGE_GATE_COOKIE,
+        },
+        "timeout": 15,
+    }
+    proxy_cfg = get_proxies()
+    if proxy_cfg:
+        request_kwargs["proxies"] = proxy_cfg
+        request_kwargs["verify"] = False
+    response = requests.get(api_url, **request_kwargs)
+    response.raise_for_status()
+    data = response.json()
+    app_data = data.get(str(appid))
+    if app_data and app_data.get("success"):
+        return app_data.get("data")
+    return None
+
+
+def _fetch_cny_rates() -> dict[str, float]:
+    """
+    拉取 1 CNY 可兑换的各币种汇率表（open.er-api，基准 CNY）。
+
+    Returns:
+        dict：{货币码: 每 1 CNY 可兑换的币种数量}；失败返回空 dict。
+    """
+    request_kwargs: dict[str, Any] = {
+        "headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        },
+        "timeout": 10,
+    }
+    proxy_cfg = get_proxies()
+    if proxy_cfg:
+        request_kwargs["proxies"] = proxy_cfg
+        request_kwargs["verify"] = False
+    try:
+        response = requests.get(_CNY_RATES_URL, **request_kwargs)
+        response.raise_for_status()
+        data = response.json()
+        if data.get("result") == "success":
+            return data.get("rates") or {}
+    except Exception as e:
+        log_error("steam_utils._fetch_cny_rates", f"获取汇率异常: {e}")
+    return {}
+
+
+def get_multi_region_prices(
+    appid: int | str, regions: list[str]
+) -> dict[str, Any]:
+    """
+    并发查询同一游戏在多个区域的价格，并按汇率换算成人民币（CNY）便于比较。
+
+    限制并发 5，单次手动查询约 N 个区域 = N 个请求，远低于 Steam 限流
+    （约 200 请求/5 分钟/IP）。价格随打折浮动，由调用方决定是否缓存。
+
+    Args:
+        appid: Steam AppID。
+        regions: 区域码列表（小写 cc，如 ["cn", "us", "jp"]）。
+
+    Returns:
+        dict：包含 name、rows（各区域价格，已折算 cny）、failed（无价格区域）。
+        rows 元素键：cc / currency / is_free / final_formatted / initial_formatted
+                     / discount_percent / final / initial / cny / cny_ok。
+        全部区域都失败时返回 {"error": ...}。
+    """
+    if not regions:
+        return {"error": "未配置任何查询区域"}
+
+    def _fetch_one(cc: str) -> tuple[str, dict[str, Any] | None]:
+        try:
+            return cc, _fetch_region_price(appid, cc)
+        except Exception as e:
+            log_error(
+                "steam_utils.get_multi_region_prices",
+                f"区域 {cc} 请求异常 (AppID: {appid}): {e}",
+            )
+            return cc, None
+
+    rows: list[dict[str, Any]] = []
+    failed: list[str] = []
+    name: str | None = None
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(_fetch_one, cc) for cc in regions]
+        for future in as_completed(futures):
+            cc, data = future.result()
+            if not data:
+                failed.append(cc)
+                continue
+            if name is None:
+                name = data.get("name")
+
+            price = data.get("price_overview")
+            if data.get("is_free") or not price:
+                if data.get("is_free"):
+                    rows.append({
+                        "cc": cc,
+                        "currency": "FREE",
+                        "is_free": True,
+                        "final_formatted": "免费",
+                        "initial_formatted": "",
+                        "discount_percent": 0,
+                        "final": 0.0,
+                        "initial": 0.0,
+                        "cny": 0.0,
+                        "cny_ok": True,
+                    })
+                else:
+                    # 非免费但无价格：该区未上架/锁区/不可购买
+                    failed.append(cc)
+                continue
+
+            rows.append({
+                "cc": cc,
+                "currency": price.get("currency"),
+                "is_free": False,
+                "final_formatted": price.get("final_formatted") or "",
+                "initial_formatted": price.get("initial_formatted") or "",
+                "discount_percent": int(price.get("discount_percent") or 0),
+                "final": int(price.get("final") or 0) / 100,
+                "initial": int(price.get("initial") or 0) / 100,
+                "cny": None,
+                "cny_ok": False,
+            })
+
+    if not rows:
+        return {
+            "name": name,
+            "appid": appid,
+            "rows": [],
+            "failed": failed,
+            "error": "所有查询区域均无价格（锁区/未上架/网络异常）",
+        }
+
+    # 折算人民币：1 CNY 可兑 X 外币 → 折合 CNY = final / rates[外币]
+    currencies = {r["currency"] for r in rows if not r["is_free"]}
+    rates = _fetch_cny_rates() if currencies else {}
+    for row in rows:
+        cur = row["currency"]
+        if row["is_free"]:
+            continue
+        if cur == "CNY":
+            row["cny"] = row["final"]
+            row["cny_ok"] = True
+            continue
+        rate = rates.get(cur)
+        if rate:
+            row["cny"] = row["final"] / rate
+            row["cny_ok"] = True
+
+    return {"name": name, "appid": appid, "rows": rows, "failed": failed}

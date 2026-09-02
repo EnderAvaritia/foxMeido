@@ -104,6 +104,7 @@ python scripts/migrate_db.py --from sqlite --to noco
 |------|------|
 | `STEAM_COOKIE` | Steam **商店页面** Cookie，`wish` 功能和热门标签提取需要。从浏览器访问 store.steampowered.com → F12 → 复制请求头 `Cookie:` 整行。格式：`sessionid=xxx; steamLogin=xxx; ...` |
 | `STEAM_CC` | 目标国家/地区码，控制 Steam API 返回的货币和区域定价。如 `cn` → 人民币、`us` → 美元、`jp` → 日元。留空则按出口 IP 自动决定 |
+| `PRICE_REGIONS` | `price` 命令查询的区域列表，逗号/空格分隔可多个。如 `cn,us,jp`。留空则用默认集合：`cn,us,jp,kr,hk,tw,sg,gb,de,fr,br,au,ca` |
 | `CURATOR_ID` | Steam 鉴赏家 ID（unreported 功能需要） |
 
 ### Playwright（可选）
@@ -282,6 +283,7 @@ Steam 非官方 API `store.steampowered.com/api/appdetails` 的参数说明、�
 | 命令 | 别名 | 说明 |
 |------|------|------|
 | `id <appid/url>` | `steam` `查商店` `steamGoods` | 查询游戏详情（名称、类型、热门标签、厂商、发行日期、价格、截图） |
+| `price <appid/url>` | `比价` | 查询多个区域的游戏价格比价（区域由 `PRICE_REGIONS` 配置，输出按折合人民币升序） |
 | `morepic <appid/url>` | `更多截图` | 发送游戏全部截图缩略图（Steam API screenshots.path_thumbnail） |
 | `pub <publisher>` | `steamPublishers` | 查询发行商页面截图 |
 | `find <关键字>` | `搜索steam游戏` | 交互式搜索 Steam 游戏，搜索结果选编号后显示详情（名称、类型、热门标签、语言、日期、发行商、价格、截图） |
@@ -346,6 +348,7 @@ foxMeido/
     ├── steamPublisherFinder.py    # 发行商页面查询
     ├── steamPublisherFinderAuto.py# 发行商链接自动触发
     ├── steamSearcher.py  # Steam 游戏搜索
+    ├── price.py          # 多区域价格比价命令
     ├── playwright_utils.py # 共享 Playwright 工具
     ├── auto_pull.py        # 自动拉取仓库更新（定时 + 手动命令）
     ├── message_reaction.py # 表情回复模块（核心函数 + 自动钩子）

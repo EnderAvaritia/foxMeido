@@ -52,7 +52,7 @@ rec = backend.update_record("records", 42, {"report": 1})
 | `NOCO_VERIFY_SSL` | 是否验证 SSL | `false` |
 | `NOCO_CHECK_REMAIN` | `get` 指令是否检查 remain 剩余份数 | `true` |
 | `HTTP_PROXY` / `HTTPS_PROXY` | 代理（calendar / wish / probe 用） | `""` |
-| `STEAM_COOKIE` / `STEAM_CC` | Steam 配置（wish / steam_utils 用） | `""` |
+| `STEAM_COOKIE` / `STEAM_CC` / `PRICE_REGIONS` | Steam 配置（wish / steam_utils / price 用） | `""` |
 | `CURATOR_ID` | 鉴赏家 ID（unreported 用） | `0` |
 
 ## 后端迁移
