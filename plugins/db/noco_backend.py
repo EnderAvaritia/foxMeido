@@ -27,7 +27,7 @@ from typing import Any
 import requests
 
 from .base import DatabaseBackend
-from .config import (
+from plugins.config import (
     request_kwargs,
     post_kwargs,
     table_url,

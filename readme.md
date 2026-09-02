@@ -336,6 +336,7 @@ foxMeido/
 ├── logs/                 # 错误日志（自动创建，gitignore）
 └── plugins/
     ├── env_utils.py        # 环境变量读取、代理配置（通用工具）
+    ├── config.py           # 全局配置中心（读取 .env：DB/Steam/代理/PRICE_REGIONS）
     ├── steam_utils.py      # Steam 通用工具
     ├── cs.py             # CS2 挂刀行情
     ├── curator_monitor.py# Steam 鉴赏家副本监控
@@ -366,11 +367,10 @@ foxMeido/
     └── db/                 # 数据库抽象层（sqlite / noco 双后端指令）
         ├── __init__.py     #   抽象层：DatabaseBackend 接口 + get_backend() 工厂
         ├── base.py         #   DatabaseBackend 抽象基类（接口定义）
-        ├── config.py       #   配置中心（DB_BACKEND 后端选择等）
         ├── sqlite.py       #   SqliteBackend 指令（SQLite 后端实现）
         ├── noco_backend.py #   NocoBackend 指令（NocoDB 后端实现）
         ├── createTables.sql#   4 张表结构参考（sqlite 自动建表同源）
-        └── README.md       #   数据库抽象层文档
+        └── README.md       #   数据库抽象层文档（配置中心已上移到 plugins/config.py）
 ```
 
 ## TODO

@@ -40,7 +40,7 @@ from nonebot.exception import FinishedException
 
 from plugins.env_utils import get_proxies
 from plugins.db import get_backend
-from plugins.db import config as db_cfg
+from plugins import config as db_cfg
 from plugins.message_reaction import reaction_cleanup
 from plugins.playwright_utils import ensure_browser, create_context
 

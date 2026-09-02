@@ -5,7 +5,7 @@ price.py - 多区域价格比价命令
     price <游戏ID/商店链接>    例：price 1091500（别名：比价）
 
 查询的区域列表由环境变量 PRICE_REGIONS 控制（逗号/空格分隔，可多个），
-留空时使用默认集合（见 plugins/db/config.py DEFAULT_PRICE_REGIONS）。
+留空时使用默认集合（见 plugins/config.py DEFAULT_PRICE_REGIONS）。
 
 输出按折合人民币升序排列，方便直接看出哪个区域最便宜。
 结果在内存中缓存 15 分钟（价格随打折浮动，短时间不会变）。
@@ -21,7 +21,7 @@ from nonebot import on_command
 from nonebot.adapters import Message
 from nonebot.params import CommandArg
 
-from plugins.db.config import PRICE_REGIONS
+from plugins.config import PRICE_REGIONS
 from plugins.message_reaction import reaction_cleanup
 from plugins.steam_utils import extract_steam_id, get_multi_region_prices
 

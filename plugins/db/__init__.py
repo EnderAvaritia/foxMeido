@@ -17,9 +17,9 @@ where 格式：[(field, op, value), ...]，op ∈ {"eq", "gt", "ne"}，value=Non
 table 为逻辑表名：account / records / remain / wishlist。
 """
 
-from . import config
+from plugins import config
+from plugins.config import BACKEND, SQLITE_PATH
 from .base import DatabaseBackend
-from .config import BACKEND, SQLITE_PATH
 
 _backend: DatabaseBackend | None = None
 

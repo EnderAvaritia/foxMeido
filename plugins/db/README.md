@@ -8,11 +8,15 @@
 plugins/db/
 ├── __init__.py       # 抽象层：DatabaseBackend 接口 + get_backend() 工厂（按 DB_BACKEND 分发）
 ├── base.py           # DatabaseBackend 抽象基类（两个后端共用的接口定义）
-├── config.py         # 配置中心（原 noco_config.py，含 DB_BACKEND / SQLITE_PATH）
 ├── sqlite.py         # SqliteBackend 指令（SQLite 后端：结构化 where → SQL）
 ├── noco_backend.py   # NocoBackend 指令（NocoDB 后端：结构化 where → NocoDB 语法）
 └── createTables.sql  # 4 张表的结构参考（sqlite 后端自动建表同源）
 ```
+
+> 配置中心已从 `plugins/db/config.py` 上移到 **`plugins/config.py`**（全局配置中心）。
+> 配置读取是通用能力，不依赖可选的 db 文件夹 —— 不启用 DB 功能而删除
+> `plugins/db/` 时，Steam / price / 代理等功能仍能正常读配置。
+> DB 相关环境变量（DB_BACKEND / SQLITE_PATH / NOCO_*）也一并定义在 `plugins/config.py`。
 
 > 命令插件（bind / get / wish / remain / probe / report / unfinished / unreported / queryWishlist / calendar）
 > 已移出到 `plugins/` 根目录，与 cs / dota / help 等其他命令插件平级，
@@ -26,7 +30,7 @@ sqlite 与 noco 各自实现为独立后端指令（`SqliteBackend` / `NocoBacke
 
 ```python
 from plugins.db import get_backend
-from plugins.db import config as cfg
+from plugins import config as cfg  # 全局配置中心（DB_BACKEND / SQLITE_PATH 等）
 
 backend = get_backend()  # DB_BACKEND=sqlite → SqliteBackend，DB_BACKEND=noco → NocoBackend
 

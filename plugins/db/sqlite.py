@@ -27,7 +27,7 @@ import sqlite3
 from typing import Any
 
 from .base import DatabaseBackend
-from .config import SQLITE_PATH
+from plugins.config import SQLITE_PATH
 from plugins.error_logger import log_error
 
 

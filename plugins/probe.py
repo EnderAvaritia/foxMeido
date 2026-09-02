@@ -26,7 +26,7 @@ import json
 import re
 import time
 
-from plugins.db import config as cfg
+from plugins import config as cfg
 from plugins.db import get_backend
 from plugins.message_reaction import reaction_cleanup
 

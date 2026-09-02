@@ -15,7 +15,7 @@ from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 
 import re
 
-from plugins.db import config as cfg
+from plugins import config as cfg
 from plugins.db import get_backend
 from plugins.steam_utils import extract_steam_id
 from plugins.message_reaction import reaction_cleanup

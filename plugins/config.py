@@ -1,5 +1,10 @@
 """
-db/config.py - 数据库配置中心（统一访问层的配置）
+config.py - 全局配置中心（读取 .env 环境变量）
+
+⚠️ 本模块位于 plugins/ 根目录而非 plugins/db/：
+  配置读取是通用能力，不能依赖可选的数据库文件夹 ——
+  用户不启用 DB 功能时可能整个删除 plugins/db/，
+  Steam / 价格 / 代理等功能仍需读取各自配置。
 
 后端选择（.env）：
   DB_BACKEND  - sqlite | noco
@@ -35,10 +40,8 @@ from typing import Any
 from plugins.env_utils import _read_dotenv, get_http_proxy, get_proxies, _env_bool
 
 
-# 项目根目录：此文件位于 plugins/db/，往上级 2 层
-_PROJECT_ROOT: str = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-)
+# 项目根目录：此文件位于 plugins/，往上级 1 层
+_PROJECT_ROOT: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 # ── 后端选择 ────────────────────────────────────────────────────
