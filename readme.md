@@ -89,6 +89,25 @@ python scripts/migrate_db.py --from noco --to sqlite
 python scripts/migrate_db.py --from sqlite --to noco
 ```
 
+**数据库抽象层（插件开发用）**：`sqlite` / `noco` 各自实现为独立后端指令，统一继承 `DatabaseBackend` 抽象基类。命令插件通过 `get_backend()` 获取当前配置（`DB_BACKEND`）对应的后端实例，只依赖抽象接口，不感知具体后端。配置读取统一在 `plugins/config.py`（全局配置中心，与可选的 db 文件夹解耦）：
+
+```python
+from plugins.db import get_backend
+from plugins import config as cfg  # 全局配置中心（DB_BACKEND / SQLITE_PATH 等）
+
+backend = get_backend()  # DB_BACKEND=sqlite → SqliteBackend，DB_BACKEND=noco → NocoBackend
+
+# where: [(field, op, value), ...]，op ∈ {eq, gt, ne}，value=None 表示 NULL 判断
+rec = backend.get_record("account", [("account", "eq", "123456")])
+rows = backend.get_records("remain", [("canBeClaimed", "gt", 0)], sort="created_at")
+rec = backend.create_record("wishlist", {...})
+rec = backend.update_record("records", 42, {"report": 1})
+```
+
+逻辑表名：`account` / `records` / `remain` / `wishlist`。
+返回约定：查询为空返回 `""`，失败返回 `{"error": ...}`，列表返回 `{"list": [...], "pageInfo": {"totalRows": n}}`。
+表结构参考 `plugins/db/createTables.sql`（sqlite 自动建表同源）。
+
 ### 代理（可选）
 
 国内访问 Steam / iflow 需要代理转发。只设 `HTTP_PROXY` 即可，`HTTPS_PROXY` 自动同步。
@@ -369,8 +388,7 @@ foxMeido/
         ├── base.py         #   DatabaseBackend 抽象基类（接口定义）
         ├── sqlite.py       #   SqliteBackend 指令（SQLite 后端实现）
         ├── noco_backend.py #   NocoBackend 指令（NocoDB 后端实现）
-        ├── createTables.sql#   4 张表结构参考（sqlite 自动建表同源）
-        └── README.md       #   数据库抽象层文档（配置中心已上移到 plugins/config.py）
+        └── createTables.sql#   4 张表结构参考（sqlite 自动建表同源）
 ```
 
 ## TODO
