@@ -126,6 +126,8 @@ async def get_message(goodId):
         lines.append(f'发行商：{gameInfo["publisher"]}')
     if price_format:
         lines.append(price_format.lstrip("\n"))
+    if gameInfo.get("region_note"):
+        lines.append(f'注：{gameInfo["region_note"]}')
     lines.append(f'Steam商店页链接：https://store.steampowered.com/app/{appid}')
     return '\n'.join(lines) + '\n' + pic        
 

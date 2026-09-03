@@ -189,6 +189,8 @@ async def get_choice(number: int):
         lines.append(f'发行商：{gameInfo["publisher"]}')
     if price_format:
         lines.append(price_format)
+    if gameInfo.get("region_note"):
+        lines.append(f'注：{gameInfo["region_note"]}')
     lines.append(f'Steam商店页链接：https://store.steampowered.com/app/{appid}')
     info_text = '\n'.join(lines)
 

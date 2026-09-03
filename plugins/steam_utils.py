@@ -57,8 +57,10 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
     """
     通过 Steam Web API 获取游戏名称、厂商名、发行日期、支持语言、类型和价格信息。
 
-    如果设置了 STEAM_CC 且目标区返回 success=false（锁区），
-    自动降级到不带 cc 参数重新请求。
+    区域回落链（依次尝试，命中即停）：
+      ① STEAM_CC（若配置）→ ② 不带 cc（区域按出口 IP）→ ③ cc=us 最终兜底
+    ③ 保证"国区等本地区未上架、但美区有售"的游戏（如部分锁区作品）
+    仍能查到资料，不会误报"数据获取出错"。
 
     Args:
         appid: Steam AppID。
@@ -66,6 +68,7 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
     Returns:
         dict: 包含 game_name、publisher、release_date、supported_languages、
               genres、initial、final、currency 的字典，出错时含 error 键。
+              命中 ③ 兜底时额外含 region_note 提示（价格按美区参考）。
     """
     game_name: str | None = None
     publisher: str | None = None
@@ -76,26 +79,39 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
     final: float = 1
     currency: str | None = None
     errors: list[str] = []
+    used_cc: str | None = None
 
     try:
-        # 第一次请求：带 STEAM_CC（如果有的话）
-        details = None
+        # 回落链：① STEAM_CC（若有）→ ② 不带 cc（出口 IP 决定）→ ③ cc=us 兜底
+        # ③ 覆盖"本地未上架但美区有售"的锁区游戏，避免误报数据获取出错
+        attempts: list[str] = []
         if STEAM_CC:
+            attempts.append(STEAM_CC)
+        attempts.append("")
+        if "us" not in attempts:
+            attempts.append("us")
+
+        details = None
+        last_exc: Exception | None = None
+        clean_none = False  # 是否有候选请求本身成功但 success=false（锁区/无效）
+        for cc in attempts:
             try:
-                details = _fetch_app_data(appid, STEAM_CC)
-            except Exception:
+                candidate = _fetch_app_data(appid, cc)
+            except Exception as e:
+                last_exc = e
                 log_error("steam_utils.get_game_info",
-                           f"STEAM_CC={STEAM_CC} 请求异常 (AppID: {appid})，降级到默认区域")
-
-        # 如果带 cc 失败（网络异常或锁区），且 STEAM_CC 有值，降级重试
-        if details is None and STEAM_CC:
+                          f"cc={cc or '(默认)'} 请求异常 (AppID: {appid})，尝试下一候选区域")
+                continue
+            if candidate is not None:
+                details = candidate
+                used_cc = cc
+                break
+            clean_none = True
             log_error("steam_utils.get_game_info",
-                       f"STEAM_CC={STEAM_CC} 目标区不可用 (AppID: {appid})，降级到默认区域")
-            details = _fetch_app_data(appid)
-
-        # STEAM_CC 未设置，直接请求（不带 cc）
-        if details is None and not STEAM_CC:
-            details = _fetch_app_data(appid)
+                      f"cc={cc or '(默认)'} 区域不可用/锁区 (AppID: {appid})，尝试下一候选区域")
+        if details is None and last_exc is not None and not clean_none:
+            # 所有候选均为网络/HTTP 异常：交回外层统一报告网络错误
+            raise last_exc
 
         if details is not None:
             game_name = details.get("name")
@@ -165,6 +181,8 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
         "final": final,
         "currency": currency,
     }
+    if used_cc == "us" and STEAM_CC != "us":
+        result["region_note"] = "默认区域未上架，以下价格/资料按美区（USD）参考"
     if errors:
         result["error"] = "; ".join(errors)
     return result
@@ -182,6 +200,9 @@ def get_game_screenshots(appid: int | str) -> list[str]:
     """
     try:
         details = _fetch_app_data(appid)
+        if not details:
+            # 默认区域锁区/不可用 → 用美区兜底（截图与区域无关，锁区游戏也能取到）
+            details = _fetch_app_data(appid, "us")
         if not details:
             return []
         screenshots = details.get("screenshots") or []
@@ -219,6 +240,10 @@ def get_popular_tags(appid: int | str) -> dict[str, Any]:
     优先从页面中 InitAppTagModal() 调用提取 JSON 数据（含 tagid、name、count），
     提取失败时退而求其次从 a.app_tag 元素获取纯文本标签名。
 
+    默认请求带 STEAM_COOKIE 的当前区域页面；若该页面拿不到标签
+    （如国区未上架/锁区导致页面不渲染标签），改用 ?cc=us 的匿名页面兜底，
+    确保锁区游戏也能返回标签。
+
     Args:
         appid: Steam AppID。
 
@@ -227,47 +252,53 @@ def get_popular_tags(appid: int | str) -> dict[str, Any]:
     """
     tags: list[str] = []
     errors: list[str] = []
+    proxy_cfg = get_proxies()
 
-    url = f"https://store.steampowered.com/app/{appid}/"
-
-    try:
-        request_kwargs: dict[str, Any] = {
-            "headers": {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36",
-            },
-            "timeout": 15,
+    def _request_page(url: str, with_cookie: bool) -> str:
+        """请求商店页并返回 HTML，请求失败抛 requests 异常。"""
+        headers: dict[str, str] = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36",
         }
-        if STEAM_COOKIE:
-            request_kwargs["headers"]["Cookie"] = STEAM_COOKIE
-        proxy_cfg = get_proxies()
+        if with_cookie and STEAM_COOKIE:
+            headers["Cookie"] = STEAM_COOKIE
+        elif not with_cookie:
+            # 匿名兜底页：带上年龄 Cookie，避免成人内容落到 age-gate 页拿不到标签
+            headers["Cookie"] = _AGE_GATE_COOKIE
+        request_kwargs: dict[str, Any] = {"headers": headers, "timeout": 15}
         if proxy_cfg:
             request_kwargs["proxies"] = proxy_cfg
             request_kwargs["verify"] = False
         response = requests.get(url, **request_kwargs)
         response.raise_for_status()
+        return response.text
 
-        html = response.text
+    def _extract_tags(html: str) -> list[str]:
+        """优先 InitAppTagModal JSON，其次 a.app_tag 元素。"""
+        extracted = _extract_from_init_tag_modal(html, str(appid))
+        if extracted:
+            return extracted
+        return _extract_from_app_tag_elements(html)
 
-        # 方法 1：从 InitAppTagModal() 提取 JSON 数据
-        tags = _extract_from_init_tag_modal(html, str(appid))
-
-        if tags:
-            return {"tags": tags}
-
-        # 方法 2：退而求其次，从 a.app_tag 元素提取
-        tags = _extract_from_app_tag_elements(html)
-
-        if tags:
-            return {"tags": tags}
-
-        errors.append("页面中未找到标签数据，页面结构可能已变更")
-
-    except requests.exceptions.RequestException as e:
-        errors.append(f"请求商店页面时发生网络错误: {e}")
-    except Exception as e:
-        errors.append(f"提取标签时发生未知错误: {e}")
+    # 候选页：先当前区域（带 cookie），拿不到再美区匿名页兜底（锁区/未上架）
+    page_urls: list[tuple[str, bool]] = [
+        (f"https://store.steampowered.com/app/{appid}/", True),
+        (f"https://store.steampowered.com/app/{appid}/?cc=us&l=schinese", False),
+    ]
+    for url, with_cookie in page_urls:
+        try:
+            html = _request_page(url, with_cookie)
+            tags = _extract_tags(html)
+            if tags:
+                return {"tags": tags}
+            errors.append(
+                f"页面中未找到标签数据（{url}），页面结构可能已变更"
+            )
+        except requests.exceptions.RequestException as e:
+            errors.append(f"请求商店页面时发生网络错误（{url}）: {e}")
+        except Exception as e:
+            errors.append(f"提取标签时发生未知错误（{url}）: {e}")
 
     return {"tags": tags, "error": "; ".join(errors) if errors else None}
 

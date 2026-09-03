@@ -171,6 +171,7 @@ async def ensure_browser():
 async def create_context(
     viewport_size: dict | None = None,
     cookie_file: str | None = None,
+    load_cookie: bool = True,
 ) -> object | None:
     """
     从全局浏览器创建一个独立上下文（含代理配置），可选加载指定 cookie 文件。
@@ -182,6 +183,8 @@ async def create_context(
         viewport_size: 可选视口尺寸。
         cookie_file: 可选的 cookie 文件相对路径（项目根目录相对）。
                      不设则按 PLAYWRIGHT_COOKIE_FILE 加载。
+        load_cookie: 是否加载 cookie。锁区兜底截图需要匿名访问美区页时
+                     传 False，避免账号所属区域把页面拉回不可见区域。
 
     Returns:
         BrowserContext | None
@@ -194,10 +197,11 @@ async def create_context(
         if proxy:
             ctx_kwargs["proxy"] = {"server": proxy}
         context = await _browser.new_context(**ctx_kwargs)
-        if cookie_file:
-            await _load_cookie_from_file(context, cookie_file)
-        else:
-            await load_cookie_file(context)
+        if load_cookie:
+            if cookie_file:
+                await _load_cookie_from_file(context, cookie_file)
+            else:
+                await load_cookie_file(context)
         return context
     except Exception as e:
         log_error("create_context", f"上下文创建失败: {e}")
@@ -225,7 +229,7 @@ async def _load_cookie_from_file(context, rel_path: str) -> None:
         log_error("_load_cookie_from_file", f"Cookie 加载异常: {e}")
 
 
-async def create_page(viewport_size: dict | None = None):
+async def create_page(viewport_size: dict | None = None, load_cookie: bool = True):
     """
     从全局浏览器创建一个新页面（含代理配置）。
 
@@ -234,6 +238,8 @@ async def create_page(viewport_size: dict | None = None):
 
     Args:
         viewport_size: 可选视口尺寸，例如 {"width": 800, "height": 19200}。
+        load_cookie: 是否加载 cookie。锁区兜底截图需要匿名访问美区页时
+                     传 False，避免账号所属区域把页面拉回不可见区域。
 
     Returns:
         page | None
@@ -246,7 +252,8 @@ async def create_page(viewport_size: dict | None = None):
         if proxy:
             ctx_kwargs["proxy"] = {"server": proxy}
         context = await _browser.new_context(**ctx_kwargs)
-        await load_cookie_file(context)
+        if load_cookie:
+            await load_cookie_file(context)
         page = await context.new_page()
         if viewport_size:
             await page.set_viewport_size(viewport_size)
@@ -356,23 +363,47 @@ async def take_app_screenshot(appid: str) -> bytes | None:
 
     自动处理年龄验证，失败/不存在返回 None。
     并发安全 —— 每次调用创建独立 page。
+
+    锁区兜底：默认区域（带 cookie）页面拿不到 glance_ctn 时，
+    改用匿名 + cc=us 的美区页面重试一次，让国区未上架的游戏也能截到详情。
     """
     print(f"[screenshot] take_app_screenshot: appid={appid}")
-    url = f"https://store.steampowered.com/app/{appid}/_/?l=schinese"
     if not await ensure_browser():
         return None
-    page = await create_page()
-    if not page:
-        return None
-    try:
-        if not await _navigate_with_age_gate(page, url):
-            await _save_failure_screenshot(page, f"take_app_screenshot_{appid}")
-            return None
-        print("[screenshot] 开始截图 glance_ctn")
-        return await _screenshot_element(page, '//div[@class="glance_ctn"]')
-    finally:
-        await page.context.close()
-        print("[screenshot] 页面已关闭")
+
+    # 候选 URL：先默认区域（带登录 cookie），失败后美区匿名兜底
+    candidates: list[tuple[str, bool]] = [
+        (f"https://store.steampowered.com/app/{appid}/_/?l=schinese", True),
+        (f"https://store.steampowered.com/app/{appid}/_/?cc=us&l=schinese", False),
+    ]
+    for index, (url, load_cookie) in enumerate(candidates):
+        is_last = index == len(candidates) - 1
+        if load_cookie:
+            print(f"[screenshot] 尝试默认区域: {url}")
+        else:
+            print(f"[screenshot] 默认区域未截到，改用美区匿名兜底: {url}")
+        page = await create_page(load_cookie=load_cookie)
+        if not page:
+            continue
+        try:
+            if not await _navigate_with_age_gate(page, url):
+                if is_last:
+                    await _save_failure_screenshot(page, f"take_app_screenshot_{appid}")
+                continue
+            # 先探测元素是否存在，避免"页面可开但无价格区（锁区）"误报截图失败
+            glance_ctn = page.locator('xpath=//div[@class="glance_ctn"]')
+            if await glance_ctn.count() == 0:
+                if is_last:
+                    await _save_failure_screenshot(page, f"take_app_screenshot_{appid}")
+                continue
+            print("[screenshot] 开始截图 glance_ctn")
+            pic = await _screenshot_element(page, '//div[@class="glance_ctn"]')
+            if pic is not None:
+                return pic
+        finally:
+            await page.context.close()
+            print("[screenshot] 页面已关闭")
+    return None
 
 
 async def take_publisher_screenshot(url: str) -> bytes | None:
