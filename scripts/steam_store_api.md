@@ -73,6 +73,8 @@ GET https://store.steampowered.com/api/appdetails
 
 ## 本仓库使用点
 
-- `plugins/steam_utils.py`：`get_game_info`（详情+单区价格）、`get_multi_region_prices`（多区并发+汇率换算）
+- `plugins/steam_utils.py`：`get_game_info`（详情+单区价格，全量请求）、
+  `get_multi_region_prices`（多区并发，每区仅 `filters=price_overview` 只取价格，
+  元数据单独一次 `filters=basic`/全量兜底）
 - `plugins/price.py`：`price` / `比价` 命令
 - 汇率换算基准为人民币（CNY）：`https://open.er-api.com/v6/latest/CNY`（每日更新，免费）

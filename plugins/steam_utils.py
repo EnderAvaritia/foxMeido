@@ -336,12 +336,19 @@ _CNY_RATES_URL = "https://open.er-api.com/v6/latest/CNY"
 
 def _fetch_region_price(appid: int | str, cc: str) -> dict[str, Any] | None:
     """
-    请求指定区域（cc）的 appdetails，返回完整 data dict；失败/锁区返回 None。
+    请求指定区域（cc）的价格，只取 price_overview 字段，返回最小 data dict。
 
+    用 filters=price_overview 把响应压到几百字节（不带 filter 是全量，往往数百 KB）。
     不做登录态，仅带年龄 Cookie —— 保证 cc 参数决定货币，
     不受 STEAM_COOKIE 账户所属区域干扰。
+
+    返回 None 表示请求失败或该区 success=false（锁区）；成功则返回 data，
+    其中可能只有 price_overview（有价格）或空 dict（免费/该区无价格）。
     """
-    api_url = f"https://store.steampowered.com/api/appdetails?appids={appid}&l=schinese&cc={cc}"
+    api_url = (
+        f"https://store.steampowered.com/api/appdetails?appids={appid}"
+        f"&l=schinese&cc={cc}&filters=price_overview"
+    )
     request_kwargs: dict[str, Any] = {
         "headers": {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -361,6 +368,50 @@ def _fetch_region_price(appid: int | str, cc: str) -> dict[str, Any] | None:
     app_data = data.get(str(appid))
     if app_data and app_data.get("success"):
         return app_data.get("data")
+    return None
+
+
+def _fetch_meta(appid: int | str) -> dict[str, Any] | None:
+    """
+    获取游戏基础元数据（名称、是否免费），供比价结果展示与免费游戏判定。
+
+    优先用 filters=basic（响应很小）；若该响应不含 is_free 字段（无法确认
+    免费），则回退一次无 filter 的全量请求，保证免费游戏不被误判为"无价格"。
+    """
+    api_url = (
+        f"https://store.steampowered.com/api/appdetails?appids={appid}"
+        f"&l=schinese&filters=basic"
+    )
+    request_kwargs: dict[str, Any] = {
+        "headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36",
+            "Cookie": _AGE_GATE_COOKIE,
+        },
+        "timeout": 15,
+    }
+    proxy_cfg = get_proxies()
+    if proxy_cfg:
+        request_kwargs["proxies"] = proxy_cfg
+        request_kwargs["verify"] = False
+    try:
+        response = requests.get(api_url, **request_kwargs)
+        response.raise_for_status()
+        data = response.json()
+        app_data = data.get(str(appid))
+        if app_data and app_data.get("success"):
+            meta = app_data.get("data") or {}
+            if "is_free" in meta:
+                return meta
+            # basic 未返回 is_free → 用全量请求兜底，确保免费游戏识别正确
+            return _fetch_app_data(appid)
+    except Exception as e:
+        log_error("steam_utils._fetch_meta", f"获取游戏元数据异常 (AppID: {appid}): {e}")
+        try:
+            return _fetch_app_data(appid)
+        except Exception:
+            return None
     return None
 
 
@@ -400,8 +451,10 @@ def get_multi_region_prices(
     """
     并发查询同一游戏在多个区域的价格，并按汇率换算成人民币（CNY）便于比较。
 
-    限制并发 5，单次手动查询约 N 个区域 = N 个请求，远低于 Steam 限流
-    （约 200 请求/5 分钟/IP）。价格随打折浮动，由调用方决定是否缓存。
+    区域请求只取价格（filters=price_overview，约几百字节/区）；
+    游戏名与是否免费通过一次元数据请求获得（filters=basic，缺 is_free 时回退全量）。
+    实际请求数 ≈ 区域数 + 1，限制并发 5，远低于 Steam 限流（约 200 请求/5 分钟/IP）。
+    价格随打折浮动，由调用方决定是否缓存。
 
     Args:
         appid: Steam AppID。
@@ -416,6 +469,12 @@ def get_multi_region_prices(
     if not regions:
         return {"error": "未配置任何查询区域"}
 
+    # 元数据仅请求一次：提供游戏名与 is_free（免费判定），
+    # 区域请求保持只取价格（filters=price_overview），避免每个区域都拉全量
+    meta = _fetch_meta(appid)
+    meta_free = bool(meta and meta.get("is_free"))
+    name = meta.get("name") if meta else None
+
     def _fetch_one(cc: str) -> tuple[str, dict[str, Any] | None]:
         try:
             return cc, _fetch_region_price(appid, cc)
@@ -428,20 +487,19 @@ def get_multi_region_prices(
 
     rows: list[dict[str, Any]] = []
     failed: list[str] = []
-    name: str | None = None
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = [executor.submit(_fetch_one, cc) for cc in regions]
         for future in as_completed(futures):
             cc, data = future.result()
-            if not data:
+            if data is None:
+                # 请求失败或 success=false（该区锁区/下架）
                 failed.append(cc)
                 continue
-            if name is None:
-                name = data.get("name")
 
             price = data.get("price_overview")
-            if data.get("is_free") or not price:
-                if data.get("is_free"):
+            if not price:
+                if meta_free:
+                    # 游戏本身免费：该区无 price_overview 属正常，标记为免费
                     rows.append({
                         "cc": cc,
                         "currency": "FREE",
