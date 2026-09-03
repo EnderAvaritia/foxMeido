@@ -334,16 +334,20 @@ _AGE_GATE_COOKIE = "birthtime=1; lastagecheckage=1; wants_mature_content=1"
 _CNY_RATES_URL = "https://open.er-api.com/v6/latest/CNY"
 
 
-def _fetch_region_price(appid: int | str, cc: str) -> dict[str, Any] | None:
+def _fetch_region_price(
+    appid: int | str, cc: str
+) -> tuple[dict[str, Any] | None, str]:
     """
-    请求指定区域（cc）的价格，只取 price_overview 字段，返回最小 data dict。
+    请求指定区域（cc）的价格，只取 price_overview 字段，返回 (data, status)。
 
     用 filters=price_overview 把响应压到几百字节（不带 filter 是全量，往往数百 KB）。
     不做登录态，仅带年龄 Cookie —— 保证 cc 参数决定货币，
     不受 STEAM_COOKIE 账户所属区域干扰。
 
-    返回 None 表示请求失败或该区 success=false（锁区）；成功则返回 data，
-    其中可能只有 price_overview（有价格）或空 dict（免费/该区无价格）。
+    返回 status 语义：
+      "ok"     - 请求成功（data 含 price_overview，或空 dict：免费/该区无价）
+      "locked" - success=false：该区锁区/下架/AppID 无效
+      （网络/HTTP 异常由调用方捕获，归为 "error"）
     """
     api_url = (
         f"https://store.steampowered.com/api/appdetails?appids={appid}"
@@ -367,20 +371,23 @@ def _fetch_region_price(appid: int | str, cc: str) -> dict[str, Any] | None:
     data = response.json()
     app_data = data.get(str(appid))
     if app_data and app_data.get("success"):
-        return app_data.get("data")
-    return None
+        return app_data.get("data"), "ok"
+    return None, "locked"
 
 
 def _fetch_meta(appid: int | str) -> dict[str, Any] | None:
     """
     获取游戏基础元数据（名称、是否免费），供比价结果展示与免费游戏判定。
 
-    优先用 filters=basic（响应很小）；若该响应不含 is_free 字段（无法确认
-    免费），则回退一次无 filter 的全量请求，保证免费游戏不被误判为"无价格"。
+    固定用 cc=us 请求：元数据不受"宿主出口区域"限制 —— 即使某游戏在机器人
+    所在区域锁区，仍能拿到名称和 is_free，不会把锁区游戏误判成"无效 AppID"。
+
+    优先用 filters=basic（响应较小）；若该响应不含 is_free 字段（无法确认
+    免费），则回退一次全量请求（同样 cc=us），保证免费游戏不被误判。
     """
     api_url = (
         f"https://store.steampowered.com/api/appdetails?appids={appid}"
-        f"&l=schinese&filters=basic"
+        f"&l=schinese&cc=us&filters=basic"
     )
     request_kwargs: dict[str, Any] = {
         "headers": {
@@ -405,11 +412,11 @@ def _fetch_meta(appid: int | str) -> dict[str, Any] | None:
             if "is_free" in meta:
                 return meta
             # basic 未返回 is_free → 用全量请求兜底，确保免费游戏识别正确
-            return _fetch_app_data(appid)
+            return _fetch_app_data(appid, "us")
     except Exception as e:
         log_error("steam_utils._fetch_meta", f"获取游戏元数据异常 (AppID: {appid}): {e}")
         try:
-            return _fetch_app_data(appid)
+            return _fetch_app_data(appid, "us")
         except Exception:
             return None
     return None
@@ -452,7 +459,8 @@ def get_multi_region_prices(
     并发查询同一游戏在多个区域的价格，并按汇率换算成人民币（CNY）便于比较。
 
     区域请求只取价格（filters=price_overview，约几百字节/区）；
-    游戏名与是否免费通过一次元数据请求获得（filters=basic，缺 is_free 时回退全量）。
+    游戏名与是否免费通过一次元数据请求获得（filters=basic，cc=us 固定，
+    不受宿主区域锁区影响；缺 is_free 时回退全量）。
     实际请求数 ≈ 区域数 + 1，限制并发 5，远低于 Steam 限流（约 200 请求/5 分钟/IP）。
     价格随打折浮动，由调用方决定是否缓存。
 
@@ -461,42 +469,49 @@ def get_multi_region_prices(
         regions: 区域码列表（小写 cc，如 ["cn", "us", "jp"]）。
 
     Returns:
-        dict：包含 name、rows（各区域价格，已折算 cny）、failed（无价格区域）。
+        dict：包含 name、rows（各区域价格，已折算 cny）、locked（锁区/下架区）、
+        unavailable（未上架/不可购买区）、failed（网络异常区）。
         rows 元素键：cc / currency / is_free / final_formatted / initial_formatted
                      / discount_percent / final / initial / cny / cny_ok。
-        全部区域都失败时返回 {"error": ...}。
+        全部区域无价格时返回 {"error": ...}（游戏存在则说明锁区/未上架，
+        AppID 无效则说明获取失败）。
     """
     if not regions:
         return {"error": "未配置任何查询区域"}
 
-    # 元数据仅请求一次：提供游戏名与 is_free（免费判定），
+    # 元数据仅请求一次（固定 cc=us，避免宿主区域锁区影响名称/免费判定），
     # 区域请求保持只取价格（filters=price_overview），避免每个区域都拉全量
     meta = _fetch_meta(appid)
     meta_free = bool(meta and meta.get("is_free"))
     name = meta.get("name") if meta else None
 
-    def _fetch_one(cc: str) -> tuple[str, dict[str, Any] | None]:
+    def _fetch_one(cc: str) -> tuple[str, dict[str, Any] | None, str]:
         try:
-            return cc, _fetch_region_price(appid, cc)
+            data, status = _fetch_region_price(appid, cc)
+            return cc, data, status
         except Exception as e:
             log_error(
                 "steam_utils.get_multi_region_prices",
                 f"区域 {cc} 请求异常 (AppID: {appid}): {e}",
             )
-            return cc, None
+            return cc, None, "error"
 
     rows: list[dict[str, Any]] = []
-    failed: list[str] = []
+    locked: list[str] = []      # success=false → 该区锁区/下架
+    unavailable: list[str] = []  # 成功但无价格，且非免费 → 未上架/不可购买
+    failed: list[str] = []      # 网络/HTTP 异常（瞬时，可重试）
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = [executor.submit(_fetch_one, cc) for cc in regions]
         for future in as_completed(futures):
-            cc, data = future.result()
-            if data is None:
-                # 请求失败或 success=false（该区锁区/下架）
+            cc, data, status = future.result()
+            if status == "error":
                 failed.append(cc)
                 continue
+            if status == "locked":
+                locked.append(cc)
+                continue
 
-            price = data.get("price_overview")
+            price = (data or {}).get("price_overview")
             if not price:
                 if meta_free:
                     # 游戏本身免费：该区无 price_overview 属正常，标记为免费
@@ -513,8 +528,8 @@ def get_multi_region_prices(
                         "cny_ok": True,
                     })
                 else:
-                    # 非免费但无价格：该区未上架/锁区/不可购买
-                    failed.append(cc)
+                    # 非免费但无价格：该区未上架/不可购买
+                    unavailable.append(cc)
                 continue
 
             rows.append({
@@ -531,12 +546,32 @@ def get_multi_region_prices(
             })
 
     if not rows:
+        if meta:
+            # 元数据拿得到（游戏真实存在）→ 提示锁区/未上架，而非网络错误
+            parts = []
+            if locked:
+                parts.append("锁区/下架：" + "、".join(locked))
+            if unavailable:
+                parts.append("未上架/不可购买：" + "、".join(unavailable))
+            if failed:
+                parts.append("请求失败：" + "、".join(failed))
+            return {
+                "name": name,
+                "appid": appid,
+                "rows": [],
+                "locked": locked,
+                "unavailable": unavailable,
+                "failed": failed,
+                "error": "该游戏在查询区域均不可购买（" + "；".join(parts) + "）",
+            }
         return {
-            "name": name,
+            "name": None,
             "appid": appid,
             "rows": [],
+            "locked": locked,
+            "unavailable": unavailable,
             "failed": failed,
-            "error": "所有查询区域均无价格（锁区/未上架/网络异常）",
+            "error": "获取游戏信息失败（AppID 无效，或网络异常）",
         }
 
     # 折算人民币：1 CNY 可兑 X 外币 → 折合 CNY = final / rates[外币]
@@ -555,4 +590,11 @@ def get_multi_region_prices(
             row["cny"] = row["final"] / rate
             row["cny_ok"] = True
 
-    return {"name": name, "appid": appid, "rows": rows, "failed": failed}
+    return {
+        "name": name,
+        "appid": appid,
+        "rows": rows,
+        "locked": locked,
+        "unavailable": unavailable,
+        "failed": failed,
+    }

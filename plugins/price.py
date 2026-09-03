@@ -71,10 +71,17 @@ async def handle_function(bot, event, args: Message = CommandArg()):
 
     try:
         data = await asyncio.to_thread(_query_with_cache, int(appid))
-        if not data or data.get("error") or not data.get("rows"):
+        if data is None:
             if cleanup:
                 await cleanup()
             await price_cmd.finish(f"获取 AppID {appid} 的各区价格失败，请稍后重试或检查 PRICE_REGIONS")
+        if data.get("error"):
+            if cleanup:
+                await cleanup()
+            reason = data["error"]
+            if data.get("name"):
+                await price_cmd.finish(f"{data['name']}（AppID {appid}）：{reason}")
+            await price_cmd.finish(f"AppID {appid}：{reason}")
         await price_cmd.send(message=_format_result(data), at_sender=False)
     finally:
         if cleanup:
@@ -127,10 +134,15 @@ def _format_result(data: dict[str, Any]) -> str:
             extra = f"（-{row['discount_percent']}%，原价 {original}）"
         lines.append(f"{label}  {local} {tail} {extra}".rstrip())
 
-    failed = data.get("failed") or []
-    if failed:
-        lines.append("无价格（锁区/未上架/网络异常）："
-                     + "、".join(_region_display(cc) for cc in failed))
+    # 无价格区域分三类展示：锁区/下架、未上架/不可购买、网络异常
+    if data.get("locked"):
+        lines.append("锁区/下架：" + "、".join(_region_display(cc) for cc in data["locked"]))
+    if data.get("unavailable"):
+        lines.append("无价格（未上架/不可购买）："
+                     + "、".join(_region_display(cc) for cc in data["unavailable"]))
+    if data.get("failed"):
+        lines.append("请求失败（网络异常，可稍后重试）："
+                     + "、".join(_region_display(cc) for cc in data["failed"]))
 
     priced = [r for r in rows if not r.get("is_free") and r.get("cny") is not None]
     if len(priced) >= 1 and rows:
