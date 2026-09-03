@@ -61,6 +61,8 @@ COMMAND_START=[""]
 
 登记游戏领取记录的后端数据库，两种后端可选：**SQLite**（默认）或 **NocoDB**。
 
+> 不用数据库功能？可删除 `plugins/db/` 目录，但需**同时**删除依赖它的命令插件（bind / get / remain / report / unfinished / unreported / queryWishlist / probe / calendar / wish；curator_monitor 需关闭其中的数据库同步）。Steam 查询、`price` 比价、截图、代理等功能不需要数据库——配置读取已解耦到 `plugins/config.py`，删除后不受影响。
+
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `DB_BACKEND` | 智能默认 | 后端选择：`sqlite`（默认）或 `noco`。不设置时若检测到 `NOCO_TOKEN` 已配置则默认 `noco`，否则 `sqlite` |
@@ -125,6 +127,26 @@ rec = backend.update_record("records", 42, {"report": 1})
 | `STEAM_CC` | 目标国家/地区码，控制 Steam API 返回的货币和区域定价。如 `cn` → 人民币、`us` → 美元、`jp` → 日元。留空则按出口 IP 自动决定 |
 | `PRICE_REGIONS` | `price` 命令查询的区域列表，逗号/空格分隔可多个。如 `cn,us,jp`。留空则用默认集合：`cn,us,jp,kr,hk,tw,sg,gb,de,fr,br,au,ca` |
 | `CURATOR_ID` | Steam 鉴赏家 ID（unreported 功能需要） |
+
+**price 多区域比价：**
+
+```text
+price 1091500
+比价 https://store.steampowered.com/app/1091500/Cyberpunk_2077/
+```
+
+输出按折合人民币升序排列，自动标出最低价区：
+
+```text
+Cyberpunk 2077（AppID 1091500）各区现价，按折合人民币升序
+US 美国  $19.99 ≈¥141.63 （-50%，原价 $39.99）
+JP 日本  ¥3,280 ≈¥160.90
+CN 中国  ¥ 298.00
+无价格（锁区/未上架/网络异常）：RU 俄罗斯
+最低：US 美国 ¥141.63
+```
+
+说明：外币统一用实时汇率（open.er-api.com，基准人民币）折算便于比较；结果在内存缓存 15 分钟；区域码不区分大小写，重复自动去重。
 
 ### Playwright（可选）
 
@@ -346,6 +368,7 @@ foxMeido/
 │   ├── get_curator_cookies.py  # 获取鉴赏家后台 Playwright cookie
 │   ├── fix_curator_db.py       # 修复 curator 数据库 first_seen_at 记录
 │   ├── migrate_db.py           # NocoDB ↔ SQLite 双向迁移
+│   ├── steam_store_api.md      # Steam Store API 参考（appdetails / 多区比价用）
 │   ├── steam_reviews.md         # steam_reviews.py 使用说明
 │   └── steam_reviews.py        # 提取 Steam 用户评测中的鉴赏家链接 → [`doc`](scripts/steam_reviews.md)
 ├── data/                 # 运行时数据（gitignore）
