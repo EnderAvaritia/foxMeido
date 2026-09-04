@@ -12,7 +12,7 @@ from plugins.env_utils import get_http_proxy
 from plugins.playwright_utils import take_app_screenshot
 from plugins.error_logger import log_error
 from plugins.message_reaction import reaction_cleanup
-from plugins.steam_utils import get_game_info, get_game_screenshots, get_popular_tags
+from plugins.steam_utils import get_game_info, get_game_screenshot_bytes, get_popular_tags
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_alconna import Alconna, Args, Match, UniMessage, on_alconna  # noqa: E402
@@ -199,10 +199,10 @@ async def get_choice(number: int):
         if cleanup: await cleanup()
         await steam_searcher.finish(message=info_text + "\n" + pic, at_sender=False)
     else:
-        # 截图失败时从 Steam API 获取封面图作为回落
-        fallback_urls = await asyncio.to_thread(get_game_screenshots, appid)
-        if fallback_urls:
-            pic = UniMessage.image(url=fallback_urls[0])
+        # 截图失败时从 Steam API 下载截图字节作为回落（内嵌 base64，避免 QQ 拉不到 CDN）
+        fallback_bytes = await asyncio.to_thread(get_game_screenshot_bytes, appid)
+        if fallback_bytes:
+            pic = UniMessage.image(raw=fallback_bytes)
             if cleanup: await cleanup()
             await steam_searcher.finish(message=info_text + "\n" + pic, at_sender=False)
         else:

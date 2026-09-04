@@ -216,6 +216,46 @@ def get_game_screenshots(appid: int | str) -> list[str]:
         return []
 
 
+def get_game_screenshot_bytes(appid: int | str) -> bytes | None:
+    """
+    下载游戏第一张截图缩略图的原始字节数据，用于 base64 内嵌发送。
+
+    作为 Playwright 截图失败后的回落方案：先通过 steam_utils 取截图 URL，
+    再用 requests 下载字节，绕过 QQ 无法直接拉取 Steam CDN 图片的问题。
+
+    回落链：get_game_screenshots（已含美区兜底）→ 下载首张 → 返回 bytes。
+
+    Args:
+        appid: Steam AppID。
+
+    Returns:
+        bytes | None: 截图原始字节数据，全部失败时返回 None。
+    """
+    try:
+        urls = get_game_screenshots(appid)
+        if not urls:
+            return None
+        proxy_cfg = get_proxies()
+        request_kwargs: dict[str, Any] = {
+            "headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            },
+            "timeout": 15,
+        }
+        if proxy_cfg:
+            request_kwargs["proxies"] = proxy_cfg
+            request_kwargs["verify"] = False
+        resp = requests.get(urls[0], **request_kwargs)
+        resp.raise_for_status()
+        return resp.content
+    except Exception as e:
+        log_error("steam_utils.get_game_screenshot_bytes",
+                   f"下载截图失败 (AppID: {appid}): {e}")
+        return None
+
+
 def extract_steam_id(text: str) -> str | None:
     """
     从文本中提取 Steam AppID。
