@@ -9,7 +9,7 @@ from nonebot import on_startswith
 
 from plugins.playwright_utils import take_app_screenshot
 from plugins.message_reaction import reaction_cleanup
-from plugins.steam_utils import get_game_info, get_popular_tags
+from plugins.steam_utils import get_game_info, get_game_screenshots, get_popular_tags
 
 
 steamGoods = on_startswith(("https://store.steampowered.com/app/"), ignorecase=False, priority=20, block=True)
@@ -123,7 +123,12 @@ async def get_message(goodId):
     if pic_data:
         pic = MessageSegment.image(f"base64://{base64.b64encode(pic_data).decode()}")
     else:
-        pic = '\n（截图获取失败，请点链接查看）'
+        # 截图失败时从 Steam API 获取封面图作为回落
+        fallback_urls = await asyncio.to_thread(get_game_screenshots, appid)
+        if fallback_urls:
+            pic = MessageSegment.image(fallback_urls[0])
+        else:
+            pic = '\n（截图获取失败，请点链接查看）'
     
     # 条件构建输出行，缺失信息不输出对应行
     lines = []
