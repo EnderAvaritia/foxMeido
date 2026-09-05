@@ -128,12 +128,18 @@ def get_game_info(appid: int | str) -> dict[str, Any]:
             if rd and rd.get("date"):
                 release_date = rd["date"]
 
-            # 支持语言
+            # 支持语言（超过 5 种时截断，避免输出过长）
             raw_lang = details.get("supported_languages")
             if raw_lang:
-                supported_languages = re.sub(
+                lang_str = re.sub(
                     "<.*?>", "", raw_lang
                 ).replace("*", "").replace("具有完全音频支持的语言", "")
+                # 按常见分隔符切割，取前 5 种
+                parts = [p.strip() for p in re.split(r"[,，、/]\s*", lang_str) if p.strip()]
+                if len(parts) > 5:
+                    supported_languages = "、".join(parts[:5]) + "…"
+                else:
+                    supported_languages = "、".join(parts)
 
             # 类型（genres）
             raw_genres = details.get("genres")
