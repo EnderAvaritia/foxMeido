@@ -15,7 +15,7 @@ from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 from plugins import config as cfg
-from plugins.playwright_utils import load_cookie_file, get_headless
+from plugins.playwright_utils import load_cookie_file, get_headless, is_playwright_enabled
 from plugins.message_reaction import reaction_cleanup
 
 
@@ -54,6 +54,9 @@ async def handle_function(bot, event, args: Message = CommandArg()):
     if cleanup: await cleanup()
 
 async def take_screenshot():
+    if not is_playwright_enabled():
+        print("[calendar] PLAYWRIGHT_ENABLED=false，跳过日历截图")
+        return None
     url = "https://store.steampowered.com/personalcalendar/"
     print("start_screenshot")
     await init_playwright()

@@ -60,6 +60,8 @@ async def get_message(publisher):
         if pic_data:
             pic = MessageSegment.image(f"base64://{base64.b64encode(pic_data).decode()}")
             return title + pic
+        else:
+            return title + '\n（截图获取失败，Playwright 可能已禁用）'
 
 
 async def fetch_title(url: str) -> str:

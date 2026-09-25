@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
 from plugins.env_utils import get_proxies, get_http_proxy
-from plugins.playwright_utils import get_headless, _save_failure_screenshot
+from plugins.playwright_utils import get_headless, is_playwright_enabled, _save_failure_screenshot
 from plugins.error_logger import log_error
 from plugins.message_reaction import reaction_cleanup
 
@@ -71,6 +71,9 @@ async def fetch_title(url: str) -> str:
         return f"请求出错: {e}"
         
 async def take_screenshot(url: str):
+    if not is_playwright_enabled():
+        print("[finder] PLAYWRIGHT_ENABLED=false，跳过通用页面截图")
+        return None
     async with async_playwright() as p:
         print("p")
         try:

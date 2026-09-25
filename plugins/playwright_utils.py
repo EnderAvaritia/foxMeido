@@ -28,6 +28,8 @@ _browser = None
 _cookie_file_path: str | None = None
 # 无头模式缓存（懒加载）
 _headless_cache: bool | None = None
+# Playwright 启用状态缓存（懒加载）
+_playwright_enabled_cache: bool | None = None
 
 
 def _get_cookie_file_path() -> str:
@@ -80,6 +82,34 @@ def get_headless() -> bool:
                 pass
     _headless_cache = raw.strip().lower() not in ("false", "0", "no")
     return _headless_cache
+
+
+def is_playwright_enabled() -> bool:
+    """
+    读取 PLAYWRIGHT_ENABLED（os.environ → .env 兜底）。
+    默认 True（启用 Playwright 截图）。
+    设为 false 时，截图功能改用 API 回落。
+    """
+    global _playwright_enabled_cache
+    if _playwright_enabled_cache is not None:
+        return _playwright_enabled_cache
+    raw = os.getenv("PLAYWRIGHT_ENABLED", "")
+    if not raw:
+        env_path = os.path.join(_project_root(), ".env")
+        if os.path.isfile(env_path):
+            try:
+                with open(env_path, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        if line.startswith("PLAYWRIGHT_ENABLED="):
+                            raw = line[len("PLAYWRIGHT_ENABLED="):].strip().strip('"').strip("'")
+                            break
+            except OSError:
+                pass
+    _playwright_enabled_cache = raw.strip().lower() not in ("false", "0", "no")
+    return _playwright_enabled_cache
 
 
 def _project_root() -> str:
@@ -366,8 +396,15 @@ async def take_app_screenshot(appid: str) -> bytes | None:
 
     锁区兜底：默认区域（带 cookie）页面拿不到 glance_ctn 时，
     改用匿名 + cc=us 的美区页面重试一次，让国区未上架的游戏也能截到详情。
+
+    当 PLAYWRIGHT_ENABLED=false 时，跳过 Playwright，
+    直接改用 Steam Store API 截图作为回落。
     """
     print(f"[screenshot] take_app_screenshot: appid={appid}")
+    if not is_playwright_enabled():
+        print(f"[screenshot] PLAYWRIGHT_ENABLED=false，使用 API 回落截图: appid={appid}")
+        from plugins.steam_utils import get_game_screenshot_bytes
+        return get_game_screenshot_bytes(appid)
     if not await ensure_browser():
         return None
 
@@ -412,7 +449,13 @@ async def take_publisher_screenshot(url: str) -> bytes | None:
 
     自动处理年龄验证，失败/无效返回 None。
     并发安全 —— 每次调用创建独立 page。
+
+    当 PLAYWRIGHT_ENABLED=false 时，跳过 Playwright，
+    返回 None（发行商页面无 API 回落）。
     """
+    if not is_playwright_enabled():
+        print(f"[screenshot] PLAYWRIGHT_ENABLED=false，跳过发行商页面截图: {url}")
+        return None
     if not await ensure_browser():
         return None
     page = await create_page(viewport_size={"width": 800, "height": 19200})

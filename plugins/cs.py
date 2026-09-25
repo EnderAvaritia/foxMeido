@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 
 from plugins.error_logger import log_error
-from plugins.playwright_utils import get_headless
+from plugins.playwright_utils import get_headless, is_playwright_enabled
 from plugins.message_reaction import reaction_cleanup
 
 cs = on_command("cs", rule=to_me(), aliases={"cs"}, priority=10, block=True)
@@ -43,6 +43,9 @@ async def handle_function(bot, event, messages: Message = CommandArg()):
     if cleanup: await cleanup()
     
 async def take_screenshot(args: str):
+    if not is_playwright_enabled():
+        print("[cs] PLAYWRIGHT_ENABLED=false，跳过 CS 行情截图")
+        return None
     async with async_playwright() as p:
         
         print(args)
