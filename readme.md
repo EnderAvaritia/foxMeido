@@ -112,7 +112,7 @@ rec = backend.update_record("records", 42, {"report": 1})
 
 ### 代理（可选）
 
-国内访问 Steam / iflow 需要代理转发。只设 `HTTP_PROXY` 即可，`HTTPS_PROXY` 自动同步。
+国内访问 Steam 需要代理转发。只设 `HTTP_PROXY` 即可，`HTTPS_PROXY` 自动同步。
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
@@ -154,6 +154,7 @@ Playwright 用于 Steam 页面截图（`steamGoods`、`pub` 等命令）。
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
+| `PLAYWRIGHT_ENABLED` | `true` | 是否启用 Playwright 截图。设为 `false` 时跳过 Playwright，游戏详情截图改用 Steam Store API 回落 |
 | `PLAYWRIGHT_HEADLESS` | `true` | 无头模式。设为 `false` 可在调试时看到浏览器窗口 |
 | `PLAYWRIGHT_COOKIE_FILE` | — | Playwright 格式的 Cookie 文件路径（JSON），用于登录态截图。参考 `data/cookies/steam_playwright.json.example` |
 
@@ -329,8 +330,6 @@ Steam 非官方 API `store.steampowered.com/api/appdetails` 的参数说明、�
 | `pub <publisher>` | `steamPublishers` | 查询发行商页面截图 |
 | `find <关键字>` | `搜索steam游戏` | 交互式搜索 Steam 游戏，搜索结果选编号后显示详情（名称、类型、热门标签、语言、日期、发行商、价格、截图） |
 | `pending` | — | 鉴赏家副本监控，手动触发检查 |
-| `cs [最低价] [日销量]` | — | CS2 挂刀行情表 |
-| `dota [最低价] [日销量]` | — | Dota2 挂刀行情表 |
 | `bind` | — | 将 Steam ID 绑定到 QQ 账号 |
 | `get <游戏ID> [用户ID]` | — | 登记游戏领取记录（可代他人登记） |
 | `remain <游戏ID> [份数]` | — | 剩余份数登记 / 查询当前领取情况 |
@@ -380,9 +379,7 @@ foxMeido/
     ├── env_utils.py        # 环境变量读取、代理配置（通用工具）
     ├── config.py           # 全局配置中心（读取 .env：DB/Steam/代理/PRICE_REGIONS）
     ├── steam_utils.py      # Steam 通用工具
-    ├── cs.py             # CS2 挂刀行情
     ├── curator_monitor.py# Steam 鉴赏家副本监控
-    ├── dota.py           # Dota2 挂刀行情
     ├── finder.py         # 通用页面截图
     ├── help.py           # 帮助命令
     ├── ping.py           # 心跳测试
