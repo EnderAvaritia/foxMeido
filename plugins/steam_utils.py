@@ -50,6 +50,14 @@ def _fetch_app_data(appid: int | str, cc: str = "") -> dict[str, Any] | None:
     app_data = data.get(str(appid))
     if app_data and app_data.get("success"):
         return app_data.get("data")
+    # 兜底：Steam API 有时返回的 JSON key 不同于请求的 appid
+    # （如请求 4682840 返回 key=4801750，但 data.steam_appid 仍是 4682840）
+    if data and len(data) == 1:
+        fallback_key = next(iter(data))
+        fallback = data[fallback_key]
+        if fallback and fallback.get("success"):
+            print(f"[Steam API] 使用兜底 key={fallback_key}（请求 appid={appid}）")
+            return fallback.get("data")
     return None
 
 
