@@ -402,9 +402,9 @@ async def take_app_screenshot(appid: str) -> bytes | None:
     """
     print(f"[screenshot] take_app_screenshot: appid={appid}")
     if not is_playwright_enabled():
-        print(f"[screenshot] PLAYWRIGHT_ENABLED=false，使用 API 回落截图: appid={appid}")
-        from plugins.steam_utils import get_game_screenshot_bytes
-        return get_game_screenshot_bytes(appid)
+        print(f"[screenshot] PLAYWRIGHT_ENABLED=false，使用 API 回落封面图: appid={appid}")
+        from plugins.steam_utils import get_header_image_bytes
+        return get_header_image_bytes(appid)
     if not await ensure_browser():
         return None
 

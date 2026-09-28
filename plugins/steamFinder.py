@@ -14,7 +14,7 @@ from nonebot.params import CommandArg
 
 from plugins.playwright_utils import take_app_screenshot
 from plugins.message_reaction import reaction_cleanup
-from plugins.steam_utils import get_game_info, get_game_screenshot_bytes, get_popular_tags
+from plugins.steam_utils import get_game_info, get_header_image_bytes, get_popular_tags
 
 
 steamGoods = on_command("steamGoods", aliases={"steam", "查商店", "id"}, priority=10, block=True)
@@ -108,8 +108,8 @@ async def get_message(goodId):
     if pic_data:
         pic = MessageSegment.image(f"base64://{base64.b64encode(pic_data).decode()}")
     else:
-        # 截图失败时从 Steam API 下载截图字节作为回落（内嵌 base64，避免 QQ 拉不到 CDN）
-        fallback_bytes = await asyncio.to_thread(get_game_screenshot_bytes, appid)
+        # 截图失败时从 Steam API 下载封面图作为回落（内嵌 base64，避免 QQ 拉不到 CDN）
+        fallback_bytes = await asyncio.to_thread(get_header_image_bytes, appid)
         if fallback_bytes:
             pic = MessageSegment.image(f"base64://{base64.b64encode(fallback_bytes).decode()}")
         else:
