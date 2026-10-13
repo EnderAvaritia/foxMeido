@@ -207,7 +207,11 @@ CURATOR_ID=你的鉴赏家ID
 | 命令 | 说明 |
 |------|------|
 | `pending` | 手动触发一次检查，结果发送到当前群。有今日新到游戏时额外输出 `📋 今日新到游戏` 列表 |
+| `pending init` | 建立历史基线：抓取当前所有待处理游戏并标记为历史入库（不推送、不计入「今日新到」），用于首次接入监控时防止积压库存刷屏 |
+| `pending init force` | 数据库已有记录时强制重建基线（不给 `force` 会被拦截，避免把真正的新到游戏误设为历史） |
 | `pending test` | 发送测试推送（QQ 消息 + ntfy 如有配置） |
+
+> **自动首跑**：若数据库从未初始化过（SQLite `meta` 表无 `initialized` 标记），普通 `pending` 与定时检查也会自动走上述「静默基线」路径，不会刷屏；已有历史数据的旧库视为已初始化，不受影响。基线初始化时是否把库存同步进 remain 台账，沿用现有 `CURATOR_SYNC_REMAIN` 开关。
 
 **消息格式：**
 
@@ -250,6 +254,8 @@ python scripts/fix_curator_db.py
 ```
 
 这会重置 `first_seen_at` 错误记录，仅保留真正当天入库的游戏。
+
+> 注：`pending init force` 可在 bot 内完成同类重置，无需停服执行脚本。
 
 `累计` 为 SQLite 中累积的唯一游戏总数（不会回缩）。
 
@@ -329,7 +335,7 @@ Steam 非官方 API `store.steampowered.com/api/appdetails` 的参数说明、�
 | `morepic <appid/url>` | `更多截图` | 发送游戏全部截图缩略图（Steam API screenshots.path_thumbnail） |
 | `pub <publisher>` | `steamPublishers` | 查询发行商页面截图 |
 | `find <关键字>` | `搜索steam游戏` | 交互式搜索 Steam 游戏，搜索结果选编号后显示详情（名称、类型、热门标签、语言、日期、发行商、价格、截图） |
-| `pending` | — | 鉴赏家副本监控，手动触发检查 |
+| `pending` | — | 鉴赏家副本监控，手动触发检查；首次运行自动静默建立基线 |
 | `bind` | — | 将 Steam ID 绑定到 QQ 账号 |
 | `get <游戏ID> [用户ID]` | — | 登记游戏领取记录（可代他人登记） |
 | `remain <游戏ID> [份数]` | — | 剩余份数登记 / 查询当前领取情况 |
