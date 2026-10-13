@@ -9,8 +9,10 @@ playwright_utils.py - 共享 Playwright 工具
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+import time
 from datetime import datetime
 
 from playwright.async_api import async_playwright
@@ -443,9 +445,92 @@ async def take_app_screenshot(appid: str) -> bytes | None:
     return None
 
 
+# 发行商页面游戏区选择器（按优先级尝试，附各自等待超时/毫秒）。
+#
+# Steam 已把发行商页面从旧的 #RecommendationsRows 布局迁移到 content-hub
+# 新布局：游戏渲染进 .SaleBackgroundCtn 内的 SaleSection_* 区块，由
+# saleaction/ajaxgetsaledynamicappquery 异步加载（旧选择器已全部失效）。
+# 因此优先等待新布局，再回退旧布局，最后兜底到页面内容总容器。
+_PUBLISHER_GAME_SELECTORS: list[tuple[str, int]] = [
+    ('xpath=//div[contains(@class,"SaleBackgroundCtn")]', 15000),
+    ('xpath=//div[@id="RecommendationsRows"]', 4000),
+    ('xpath=//div[@id="responsive_page_template_content"]', 4000),
+]
+
+
+async def _wait_for_images_loaded(
+    locator,
+    timeout_ms: int = 12000,
+    settle_ms: int = 1200,
+    empty_grace_ms: int = 4000,
+) -> None:
+    """
+    等待元素内的图片加载完成并趋于稳定（尽力而为，超时即返回）。
+
+    Steam content-hub 的游戏胶囊是异步渲染的：容器一可见时内部往往一张
+    图片都没有，稍后才挂载 ``img`` 并发起加载。若仅等待元素可见就截图，
+    封面图会是空白。此函数轮询容器内图片的 ``(总数, 已完成数)``，当该
+    签名稳定 ``settle_ms`` 后返回；始终为 0 张时最多等 ``empty_grace_ms``。
+    """
+    deadline = time.monotonic() + timeout_ms / 1000
+    prev_sig: tuple[int, int] | None = None
+    stable_since = time.monotonic()
+    while time.monotonic() < deadline:
+        try:
+            stats = await locator.evaluate(
+                "el => { const imgs = [...el.querySelectorAll('img')];"
+                " return { total: imgs.length,"
+                " done: imgs.filter(i => i.complete && i.naturalWidth > 0).length }; }"
+            )
+        except PlaywrightError:
+            return
+        sig = (stats["total"], stats["done"])
+        now = time.monotonic()
+        if sig != prev_sig:
+            prev_sig = sig
+            stable_since = now
+        elif sig[0] > 0 and (now - stable_since) * 1000 >= settle_ms:
+            return
+        elif sig[0] == 0 and (now - stable_since) * 1000 >= empty_grace_ms:
+            return
+        await asyncio.sleep(0.4)
+
+
+async def _screenshot_first_visible(
+    page,
+    selectors: list[tuple[str, int]],
+) -> bytes | None:
+    """
+    依次尝试一组 ``(selector, timeout_ms)``，返回第一个可见元素区域的截图。
+
+    每个选择器使用各自的等待超时，避免已失效的旧选择器白白耗尽默认 30s。
+    命中后先等待容器内图片加载稳定，避免截到空封面。全部未命中或截图失败
+    返回 None。
+    """
+    last_msg = "未提供选择器"
+    for selector, timeout_ms in selectors:
+        try:
+            locator = page.locator(selector).first
+            await locator.wait_for(state="visible", timeout=timeout_ms)
+            await _wait_for_images_loaded(locator)
+            return await locator.screenshot(timeout=15000)
+        except PlaywrightTimeout:
+            last_msg = f"等待超时: {selector}"
+            continue
+        except PlaywrightError as e:
+            last_msg = f"截图失败: {selector} ({getattr(e, 'message', e)})"
+            continue
+    log_error("_screenshot_first_visible", f"所有选择器均未命中，最后错误: {last_msg}", exc_info=False)
+    return None
+
+
 async def take_publisher_screenshot(url: str) -> bytes | None:
     """
-    Steam 发行商页面截图（RecommendationsRows 区域）。
+    Steam 发行商页面截图（游戏区）。
+
+    兼容 Steam 的新旧两种页面布局：优先截取新版 content-hub 游戏区
+    （.SaleBackgroundCtn），再回退旧的 #RecommendationsRows，最后兜底到
+    内容总容器；全部未命中时改为整页截图，尽量保证仍有内容返回。
 
     自动处理年龄验证，失败/无效返回 None。
     并发安全 —— 每次调用创建独立 page。
@@ -465,6 +550,16 @@ async def take_publisher_screenshot(url: str) -> bytes | None:
         if not await _navigate_with_age_gate(page, url):
             await _save_failure_screenshot(page, "take_publisher_screenshot")
             return None
-        return await _screenshot_element(page, '//div[@id="RecommendationsRows"]')
+        data = await _screenshot_first_visible(page, _PUBLISHER_GAME_SELECTORS)
+        if data:
+            return data
+        # 兜底：游戏区选择器全部未命中时整页截图，避免静默返回空
+        log_error("take_publisher_screenshot", "游戏区未命中，回退整页截图", exc_info=False)
+        try:
+            return await page.screenshot(full_page=True, timeout=20000)
+        except PlaywrightError as e:
+            log_error("take_publisher_screenshot", f"整页截图失败: {getattr(e, 'message', e)}")
+            await _save_failure_screenshot(page, "take_publisher_screenshot")
+            return None
     finally:
         await page.context.close()
