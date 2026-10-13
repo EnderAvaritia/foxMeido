@@ -54,6 +54,7 @@ from nonebot_plugin_apscheduler import scheduler  # noqa: E402
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "db" / "curator_state.db"
 CST = timezone(timedelta(hours=8))
+_INIT_SENTINEL = "2000-01-01 00:00:00"
 
 # ── 自定义异常 ──────────────────────────────────────────────────
 class CookieExpiredError(Exception):
@@ -82,6 +83,7 @@ class CheckResult:
     updated_games: list[PendingGame]
     today_games: list[PendingGame] | None = None
     error: str | None = None
+    baseline: bool = False
 
 
 # ── 配置读取 ──────────────────────────────────────────────────────
@@ -218,6 +220,45 @@ def _init_db() -> None:
             conn.execute("UPDATE seen_games SET first_seen_at = '2000-01-01 00:00:00' WHERE first_seen_at IS NULL")
         except sqlite3.OperationalError:
             pass  # 列已存在
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS meta (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        """)
+        # 兼容旧库：已有 seen_games 数据视为已初始化，避免自动基线误重置
+        has_meta = conn.execute("SELECT 1 FROM meta WHERE key='initialized'").fetchone()
+        if not has_meta:
+            n = conn.execute("SELECT count(*) FROM seen_games").fetchone()[0]
+            if n > 0:
+                conn.execute("INSERT INTO meta(key, value) VALUES('initialized', '1')")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _is_initialized() -> bool:
+    """是否已建立过基线（用于区分首次运行）。"""
+    conn = _get_db()
+    try:
+        row = conn.execute("SELECT value FROM meta WHERE key='initialized'").fetchone()
+        if row and str(row[0]) == "1":
+            return True
+        # 兜底：已有 seen 数据也视为已初始化
+        n = conn.execute("SELECT count(*) FROM seen_games").fetchone()[0]
+        return n > 0
+    finally:
+        conn.close()
+
+
+def _mark_initialized() -> None:
+    """记录已建立基线。"""
+    conn = _get_db()
+    try:
+        conn.execute(
+            "INSERT INTO meta(key, value) VALUES('initialized', '1') "
+            "ON CONFLICT(key) DO UPDATE SET value='1'"
+        )
         conn.commit()
     finally:
         conn.close()
@@ -247,20 +288,40 @@ def load_today_ids() -> set[str]:
         conn.close()
 
 
-def save_seen_games(games: list[PendingGame]) -> None:
-    """将当前游戏列表写入 SQLite。首次入库记录 first_seen_at，后续仅更新名称和副本数。"""
+def save_seen_games(
+    games: list[PendingGame],
+    first_seen_at: str | None = None,
+    overwrite_first_seen: bool = False,
+) -> None:
+    """将当前游戏列表写入 SQLite。首次入库记录 first_seen_at，后续仅更新名称和副本数。
+
+    first_seen_at: 覆盖写入的首次入库时间（基线初始化时传入历史时间）。
+    overwrite_first_seen: True 时冲突也更新 first_seen_at（手动 init 重置用）。
+    """
     conn = _get_db()
     try:
         now = datetime.now(CST).strftime("%Y-%m-%d %H:%M:%S")
+        fs = first_seen_at or now
         for g in games:
-            conn.execute("""
-                INSERT INTO seen_games (app_id, name, copies, first_seen_at, updated_at)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(app_id) DO UPDATE SET
-                    name=excluded.name,
-                    copies=excluded.copies,
-                    updated_at=excluded.updated_at
-            """, (g.app_id, g.name, g.copies, now, now))
+            if overwrite_first_seen:
+                conn.execute("""
+                    INSERT INTO seen_games (app_id, name, copies, first_seen_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(app_id) DO UPDATE SET
+                        name=excluded.name,
+                        copies=excluded.copies,
+                        updated_at=excluded.updated_at,
+                        first_seen_at=excluded.first_seen_at
+                """, (g.app_id, g.name, g.copies, fs, now))
+            else:
+                conn.execute("""
+                    INSERT INTO seen_games (app_id, name, copies, first_seen_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(app_id) DO UPDATE SET
+                        name=excluded.name,
+                        copies=excluded.copies,
+                        updated_at=excluded.updated_at
+                """, (g.app_id, g.name, g.copies, fs, now))
         conn.commit()
     finally:
         conn.close()
@@ -481,12 +542,35 @@ def detect_changes(
 
 
 # ── 执行检查 ──────────────────────────────────────────────────────
-async def run_check() -> CheckResult:
+async def run_check(*, init: bool = False) -> CheckResult:
     """执行一次完整的检查流程。"""
     cfg = get_config()
     html = await fetch_pending_html(
         cfg["curator_id"], cfg["curator_name"], cfg["cookie"], cfg["cookie_file"])
     result = parse_pending_page(html)
+
+    first_run = not _is_initialized()
+    if init or first_run:
+        save_seen_games(
+            result.games,
+            first_seen_at=_INIT_SENTINEL,
+            overwrite_first_seen=init,
+        )
+        _mark_initialized()
+        # remain 同步沿用现有开关（CURATOR_SYNC_REMAIN）
+        if result.games and cfg.get("sync_remain"):
+            sync_to_remain(result.games)
+        result.new_games = []
+        result.updated_games = []
+        result.today_games = []
+        result.baseline = True
+        logger.info(
+            "鉴赏家基线初始化（%s）: 游戏 %d 款已设为历史, remain 同步=%s",
+            "manual init" if init else "first run",
+            len(result.games),
+            bool(cfg.get("sync_remain")),
+        )
+        return result
 
     seen = load_seen_games()
     result.new_games, result.updated_games = detect_changes(
@@ -588,6 +672,12 @@ def maybe_ntfy(result: CheckResult, curator_name: str) -> None:
 # ── 格式化消息 ────────────────────────────────────────────────────
 def format_result(result: CheckResult, curator_name: str) -> str:
     """将检查结果格式化为 QQ 消息文本。"""
+    if result.baseline:
+        return (
+            f"✅ 初始化完成：{curator_name}\n"
+            f"已抓取 {len(result.games)} 款游戏并设为历史基线，"
+            f"不再计入「今日新到」，后续只推送真正的新到游戏"
+        )
     lines: list[str] = []
 
     if result.new_games:
@@ -649,11 +739,42 @@ async def handle_curator(bot, event):
     # 解析参数
     raw_msg = event.get_plaintext() if hasattr(event, "get_plaintext") else str(event)
     args = raw_msg.strip().split()
-    is_test = len(args) > 1 and args[1] == "test"
+    sub = args[1].lower() if len(args) > 1 else ""
+    is_test = sub == "test"
+    is_init = sub == "init"
+    is_force = is_init and len(args) > 2 and args[2].lower() == "force"
 
     if not is_configured():
         if cleanup: await cleanup()
         await curator_cmd.finish("⚠️ 未配置 CURATOR_COOKIE_FILE 或 CURATOR_COOKIE，请先设置 .env")
+
+    if is_init:
+        if _is_initialized() and not is_force:
+            if cleanup: await cleanup()
+            await curator_cmd.finish(
+                "⚠️ 数据库已有记录，疑似非首次初始化。\n"
+                "若确要重新建立基线（会把当前待处理游戏全部设为历史），"
+                "请使用 pending init force",
+                at_sender=False,
+            )
+        try:
+            result = await run_check(init=True)
+            cfg = get_config()
+            if cleanup: await cleanup()
+            await curator_cmd.finish(
+                format_result(result, cfg["curator_name"]), at_sender=False)
+        except CookieExpiredError as e:
+            if cleanup: await cleanup()
+            await curator_cmd.finish(f"❌ {e}", at_sender=False)
+        except requests.RequestException as e:
+            if cleanup: await cleanup()
+            await curator_cmd.finish(f"❌ 网络请求失败: {e}", at_sender=False)
+        except FinishedException:
+            raise
+        except Exception as e:
+            logger.exception("初始化异常")
+            if cleanup: await cleanup()
+            await curator_cmd.finish(f"❌ 初始化异常: {e}", at_sender=False)
 
     if is_test:
         cfg = get_config()
@@ -734,6 +855,9 @@ async def scheduled_check():
     logger.info("定时检查：开始执行")
     try:
         result = await run_check()
+        if result.baseline:
+            logger.info("首跑基线初始化完成，跳过推送")
+            return
         if not result.new_games and not result.updated_games and not result.today_games:
             logger.info("无变化且无今日新到游戏，跳过推送")
             return
