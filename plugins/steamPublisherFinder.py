@@ -31,7 +31,7 @@ async def handle_function(bot, event, args: Message = CommandArg()):
 
 
 async def send_message(publisher):
-    publisher = re.findall(r"(?<=publisher/)(.*)", publisher)
+    publisher = re.findall(r"(?<=publisher/)([^/?#\s]+)", publisher)
     print(publisher)
     if publisher != [] and publisher != "":
         result = await get_message(publisher)
@@ -46,7 +46,7 @@ async def get_message(publisher):
     print(publisher[0])
     # publisher[0] = tuple(item for item in publisher[0] if item)
 
-    url = "https://store.steampowered.com/publisher/" + publisher[0]
+    url = f"https://store.steampowered.com/publisher/{publisher[0]}?flavor=all_upcoming"
     print(url)
     title = await fetch_title(url)
     print(title)
