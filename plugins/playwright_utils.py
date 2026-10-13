@@ -563,3 +563,15 @@ async def take_publisher_screenshot(url: str) -> bytes | None:
             return None
     finally:
         await page.context.close()
+
+
+def publisher_screenshot_failure_message(title: str) -> str:
+    """
+    发行商页面截图失败时的用户提示（供命令版/自动版共用）。
+
+    区分两种原因：Playwright 被显式禁用（PLAYWRIGHT_ENABLED=false，非故障），
+    与页面加载超时/结构变化导致的真实截图失败。
+    """
+    if not is_playwright_enabled():
+        return f"{title}\n⚠️ 截图功能已禁用（PLAYWRIGHT_ENABLED=false），请在配置中启用后重试"
+    return f"{title}\n⚠️ 页面截图失败（可能加载超时或页面结构变化），请稍后重试"

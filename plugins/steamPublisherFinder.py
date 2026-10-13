@@ -15,7 +15,7 @@ from nonebot.params import CommandArg
 from nonebot.rule import to_me
 
 from plugins.env_utils import get_proxies
-from plugins.playwright_utils import take_publisher_screenshot
+from plugins.playwright_utils import take_publisher_screenshot, publisher_screenshot_failure_message
 from plugins.error_logger import log_error
 from plugins.message_reaction import reaction_cleanup
 
@@ -60,7 +60,7 @@ async def get_message(publisher):
         if pic_data:
             pic = MessageSegment.image(f"base64://{base64.b64encode(pic_data).decode()}")
             return title + pic
-        return f"{title}\n⚠️ 页面截图失败（可能加载超时或页面结构变化），请稍后重试"
+        return publisher_screenshot_failure_message(title)
 
 
 async def fetch_title(url: str) -> str:

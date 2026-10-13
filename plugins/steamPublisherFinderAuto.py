@@ -14,7 +14,7 @@ from nonebot.rule import to_me
 from nonebot import on_startswith
 
 from plugins.env_utils import get_proxies
-from plugins.playwright_utils import take_publisher_screenshot
+from plugins.playwright_utils import take_publisher_screenshot, publisher_screenshot_failure_message
 from plugins.error_logger import log_error
 from plugins.message_reaction import reaction_cleanup
 
@@ -59,8 +59,7 @@ async def get_message(publisher):
         if pic_data:
             pic = MessageSegment.image(f"base64://{base64.b64encode(pic_data).decode()}")
             return title + pic
-        else:
-            return title + '\n（截图获取失败，Playwright 可能已禁用）'
+        return publisher_screenshot_failure_message(title)
 
 
 async def fetch_title(url: str) -> str:
