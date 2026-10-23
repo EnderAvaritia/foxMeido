@@ -322,6 +322,42 @@ python scripts/fix_curator_db.py
 | `GIT_AUTO_PULL_FORCE_EXIT` | `false` | 是否主动退出进程。默认 `false`：交给 NoneBot 自动重载；`true`：主动退出，由 `RESTART_CMD` / 进程管理器接管 |
 | `GIT_AUTO_PULL_BRANCH` | — | 目标分支（留空自动检测当前分支） |
 
+### pi 调用（可选）
+
+在 QQ 里调用 [pi](https://github.com/earendil-works/pi) 命令行 AI agent。`pi` 以**完整 agent**模式运行（可读写文件、执行 shell 命令），在**服务器当前工作目录**下工作。
+
+> ⚠️ **安全提示**：完整 agent 能力等同把服务器 shell 暴露给了使用者。默认仅 NoneBot **SUPERUSERS** 可用；向群/个人开放前务必评估风险，建议把 `PI_WORKDIR` 收窄到隔离目录。
+
+**安装依赖**（服务器需 Node ≥ 22.19，且 `pi` 已登录模型）：
+
+```bash
+npm install -g @earendil-works/pi-coding-agent
+pi   # 首次进入后 /login 连接模型，之后即可被 bot 调用
+```
+
+**用法：**
+
+```text
+pi 帮我看下项目里有没有内存泄漏
+pi 把 plugins 下所有 Python 文件改成 4 空格缩进
+```
+
+按群（私聊按用户）维持独立会话上下文（`--session-id`），接着上次继续聊。
+
+**配置（`.env`）：**
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `PI_ENABLED` | `true` | 是否启用 pi 命令 |
+| `PI_CLI` | `pi` | pi 可执行文件路径（Windows 下若无法直接调用，请指向 exe/wrapper） |
+| `PI_MODEL` | — | 指定模型（如 `sonnet:high`；留空用 pi 默认模型） |
+| `PI_WORKDIR` | 项目根目录 | pi 工作目录，agent 可读写该目录下的文件 |
+| `PI_TIMEOUT` | `300` | 单次调用超时秒数 |
+| `PI_MAX_OUTPUT` | `2000` | 返回文本最大字符数（超出截断） |
+| `PI_APPROVE` | `true` | 是否信任项目本地配置/资源（等价 `--approve`） |
+| `PI_ALLOW_GROUPS` | — | 允许使用 pi 的群号，逗号分隔（留空则仅 SUPERUSERS） |
+| `PI_ALLOW_USERS` | — | 允许使用 pi 的 QQ 号，逗号分隔 |
+
 ## Steam Store API 参考
 
 Steam 非官方 API `store.steampowered.com/api/appdetails` 的参数说明、返回格式、注意事项和常用货币对照表 → [`scripts/steam_store_api.md`](scripts/steam_store_api.md)
@@ -350,6 +386,7 @@ Steam 非官方 API `store.steampowered.com/api/appdetails` 的参数说明、�
 | `update` / `pull` | — | 手动触发 git pull，检测到更新后自动重启机器人 |
 | `update force` | — | 强制拉取（丢弃本地未提交更改）后重启 |
 | `ping` | — | 心跳测试 |
+| `pi <问题>` | `ai` | 调用 pi AI agent（完整 agent：可读写文件、执行命令，按群持久记忆，需白名单授权） |
 | `help` | — | 显示帮助 |
 
 Steam 商店链接会自动触发查询（如发送 `https://store.steampowered.com/app/3251240`）。
@@ -409,6 +446,7 @@ foxMeido/
     ├── unreported.py     # 输出未报告记录
     ├── queryWishlist.py  # 查询愿望单记录
     ├── calendar.py       # Steam 个人日历截图
+    ├── pi.py             # 调用 pi 命令行 AI agent（完整 agent + 白名单鉴权）
     └── db/                 # 数据库抽象层（sqlite / noco 双后端指令）
         ├── __init__.py     #   抽象层：DatabaseBackend 接口 + get_backend() 工厂
         ├── base.py         #   DatabaseBackend 抽象基类（接口定义）
