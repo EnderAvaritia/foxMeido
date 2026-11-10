@@ -328,6 +328,8 @@ python scripts/fix_curator_db.py
 
 > ⚠️ **安全提示**：完整 agent 能力等同把服务器 shell 暴露给了使用者。默认仅 NoneBot **SUPERUSERS** 可用；向群/个人开放前务必评估风险，建议把 `PI_WORKDIR` 收窄到隔离目录。
 
+> 未启用（`PI_ENABLED=false`）或服务器未安装 `pi` 时，`pi` 指令会被静默忽略，不回复任何消息。
+
 **安装依赖**（服务器需 Node ≥ 22.19，且 `pi` 已登录模型）：
 
 ```bash
@@ -386,7 +388,7 @@ Steam 非官方 API `store.steampowered.com/api/appdetails` 的参数说明、�
 | `update` / `pull` | — | 手动触发 git pull，检测到更新后自动重启机器人 |
 | `update force` | — | 强制拉取（丢弃本地未提交更改）后重启 |
 | `ping` | — | 心跳测试 |
-| `pi <问题>` | `ai` | 调用 pi AI agent（完整 agent：可读写文件、执行命令，按群持久记忆，需白名单授权） |
+| `pi <问题>` | — | 调用 pi AI agent（完整 agent：可读写文件、执行命令，按群持久记忆，需白名单授权；未启用/未安装时静默忽略） |
 | `help` | — | 显示帮助 |
 
 Steam 商店链接会自动触发查询（如发送 `https://store.steampowered.com/app/3251240`）。

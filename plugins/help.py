@@ -63,7 +63,7 @@ async def handle_function(bot, event):
         "ping\n"
         "  心跳测试\n\n"
         "pi <问题>\n"
-        "  调用 pi AI agent（ai）\n"
+        "  调用 pi AI agent\n"
         "  例：pi 帮我看下项目结构\n\n"
         "help\n"
         "  显示本帮助\n\n"

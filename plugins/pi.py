@@ -3,7 +3,7 @@ pi.py - 调用 pi 命令行 AI agent（https://github.com/earendil-works/pi）
 
 用法：
     pi <问题>       让 pi（完整 agent：可读写文件、执行 shell 命令）解决问题
-                    别名：ai
+                    未启用或未安装 pi 时静默忽略，不回复任何消息
 
 按群持久记忆：每个群/私聊一个独立 session（--session-id），跨消息保留上下文。
 权限说明：pi 以 agent 模式运行，具备文件读写与命令执行能力，安全风险较高。
@@ -48,7 +48,7 @@ _PROJECT_ROOT: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _pi_locks: dict[str, asyncio.Lock] = {}
 _pi_locks_guard = threading.Lock()
 
-pi_cmd = on_command("pi", aliases={"ai"}, priority=10, block=True)
+pi_cmd = on_command("pi", priority=10, block=True)
 
 
 def _get_lock(key: str) -> asyncio.Lock:
@@ -105,6 +105,11 @@ def _authorize(group_id: int | None, user_id: int) -> str | None:
 def _resolve_cli(cli: str) -> str:
     """解析 pi 可执行文件路径（兼容 PATH / 绝对路径；找不到时回退原值）。"""
     return shutil.which(cli) or cli
+
+
+def _cli_available(cli: str) -> bool:
+    """判断 pi 是否可用：PATH 中能找到，或传入的是存在的文件路径。"""
+    return bool(shutil.which(cli)) or os.path.isfile(cli)
 
 
 def _run_pi(
@@ -169,12 +174,24 @@ def _run_pi(
 
 @pi_cmd.handle()
 async def handle_function(bot, event, args: Message = CommandArg()):
-    cleanup = await reaction_cleanup(bot, event)
+    cfg = {
+        "cli": _read_dotenv("PI_CLI") or "pi",
+        "model": _read_dotenv("PI_MODEL"),
+        "workdir": _read_dotenv("PI_WORKDIR") or _PROJECT_ROOT,
+        "timeout": int(_read_dotenv("PI_TIMEOUT") or "300"),
+        "approve": _env_bool("PI_APPROVE", "true"),
+        "max_output": int(_read_dotenv("PI_MAX_OUTPUT") or "2000"),
+    }
 
+    # 未启用或未安装 pi：静默忽略，不回复任何消息
     if not _env_bool("PI_ENABLED", "true"):
-        if cleanup:
-            await cleanup()
-        await pi_cmd.finish("pi 功能未启用（PI_ENABLED=false）。")
+        logger.debug("pi 功能未启用（PI_ENABLED=false），忽略请求")
+        return
+    if not _cli_available(cfg["cli"]):
+        logger.debug("pi 未安装或路径不可用（PI_CLI={}），忽略请求", cfg["cli"])
+        return
+
+    cleanup = await reaction_cleanup(bot, event)
 
     text = args.extract_plain_text().strip()
     if not text:
@@ -191,14 +208,6 @@ async def handle_function(bot, event, args: Message = CommandArg()):
             await cleanup()
         await pi_cmd.finish(denied)
 
-    cfg = {
-        "cli": _read_dotenv("PI_CLI") or "pi",
-        "model": _read_dotenv("PI_MODEL"),
-        "workdir": _read_dotenv("PI_WORKDIR") or _PROJECT_ROOT,
-        "timeout": int(_read_dotenv("PI_TIMEOUT") or "300"),
-        "approve": _env_bool("PI_APPROVE", "true"),
-        "max_output": int(_read_dotenv("PI_MAX_OUTPUT") or "2000"),
-    }
     sid = _session_id(group_id, user_id)
 
     await pi_cmd.send("🧠 pi 处理中…（agent 模式，可能需要较久）", at_sender=False)
