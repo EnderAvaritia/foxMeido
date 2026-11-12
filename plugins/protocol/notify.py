@@ -1,5 +1,9 @@
 """
-notify.py - 主动消息（无事件上下文）
+notify.py - 统一发送入口
+
+``send`` 同时处理两类发送：
+- matcher 回复：传入 ``matcher``，走 ``matcher.send`` / ``matcher.finish``；
+- 主动消息：传入 ``target`` 或 ``event``，从 ``get_bots()`` 里显式选 Bot 后 call_api。
 
 绝不再使用 nonebot.get_bot()：多个 Bot 同时连接时它会按连接顺序返回第一个，
 导致消息发到错误的协议端。这里始终从 get_bots() 里显式筛选。
@@ -17,15 +21,16 @@ NoneBot 会因 self_id 重复抛 RuntimeError。迁移期请用 PROTOCOL_PRIMARY
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, NoReturn
 
 from nonebot import get_bots
+from nonebot.internal.matcher import current_bot
 from nonebot.log import logger
 
 from plugins.env_utils import _read_dotenv
 
 from .errors import is_send_exception, wrap_send_error
-from .identity import ChatRef
+from .identity import ChatRef, receive
 from .messaging import MessageLike, export
 
 _ADAPTER_ALIASES = {
@@ -88,43 +93,116 @@ def select_bot(
     return None
 
 
-async def _send(
-    kind: Literal["group", "private"],
-    target: int,
+async def send(
     message: MessageLike,
     *,
+    matcher: Any | None = None,
+    event: Any | None = None,
+    target: ChatRef | None = None,
+    bot: Any | None = None,
     adapter: str | None = None,
     self_id: str | None = None,
+    finish: bool = False,
+    **kwargs: Any,
 ) -> bool:
-    bot = select_bot(adapter=adapter, self_id=self_id)
-    if bot is None:
+    """发送消息：有 matcher 时回复当前事件，否则按 target/event 主动发送。
+
+    Args:
+        message: 协议中立消息（str 或 UniMessage）。
+        matcher: 事件处理 matcher；提供时走 matcher 回复分支。
+        event: 事件；主动发送且未给 target 时用于推断聊天目标。
+        target: 主动发送的目标聊天。
+        bot: 显式指定 Bot；不传时 matcher 分支用 current_bot，
+            主动分支用 select_bot 从 get_bots() 里筛选。
+        adapter / self_id: 主动发送时限定 Bot 的协议端 / self_id。
+        finish: True 时调用 matcher.finish 并结束事件处理。
+
+    Returns:
+        bool: matcher 分支发送成功返回 True；主动分支 call_api 成功返回 True，
+        没有可用 Bot 时返回 False。
+    """
+
+    if finish and matcher is None:
+        raise ValueError("finish=True 需要 matcher")
+
+    if matcher is not None:
+        active_bot = bot or current_bot.get()
+        exported = await export(message, active_bot)
+        try:
+            if finish:
+                await matcher.finish(exported, **kwargs)
+            else:
+                await matcher.send(exported, **kwargs)
+            return True
+        except Exception as exc:
+            if is_send_exception(exc):
+                raise wrap_send_error(exc) from exc
+            raise
+
+    received = receive(event) if event is not None else None
+    ref = target or (received.chat if received is not None else None)
+    if ref is None:
+        raise ValueError("send() 需要 matcher，或 target/event")
+
+    active_bot = bot or select_bot(adapter=adapter, self_id=self_id)
+    if active_bot is None:
         logger.warning(
             "没有可用的 Bot 发送{}消息 (target={}, adapter={}, self_id={})",
-            "群" if kind == "group" else "私聊",
-            target,
+            "群" if ref.scene == "group" else "私聊",
+            ref.peer_id,
             adapter,
             self_id,
         )
         return False
 
     try:
-        exported = await export(message, bot)
-        name = adapter_name(bot)
+        exported = await export(message, active_bot)
+        name = adapter_name(active_bot)
 
         if name == "Milky":
-            api = "send_group_message" if kind == "group" else "send_private_message"
+            api = "send_group_message" if ref.scene == "group" else "send_private_message"
             payload: dict[str, Any] = {"message": exported}
         elif name == "OneBot V11":
-            api = "send_group_msg" if kind == "group" else "send_private_msg"
+            api = "send_group_msg" if ref.scene == "group" else "send_private_msg"
             # OneBot V11 的 call_api 直接走 JSON；Message 先序列化成 CQ 码字符串
             payload = {"message": str(exported)}
         else:
             logger.warning("未知适配器 {}，无法发送主动消息", name)
             return False
 
-        payload["group_id" if kind == "group" else "user_id"] = int(target)
-        await bot.call_api(api, **payload)
+        payload["group_id" if ref.scene == "group" else "user_id"] = ref.peer_id
+        await active_bot.call_api(api, **payload)
         return True
+    except Exception as exc:
+        if is_send_exception(exc):
+            raise wrap_send_error(exc) from exc
+        raise
+
+
+async def finish(
+    matcher: Any,
+    message: MessageLike,
+    *,
+    bot: Any | None = None,
+    **kwargs: Any,
+) -> NoReturn:
+    """发送最终消息并结束事件处理（兼容旧接口）。"""
+
+    await send(message, matcher=matcher, bot=bot, finish=True, **kwargs)
+    raise RuntimeError("matcher.finish() did not raise FinishedException")
+
+
+async def reject(
+    matcher: Any,
+    message: MessageLike,
+    *,
+    bot: Any | None = None,
+    **kwargs: Any,
+) -> NoReturn:
+    """拒绝当前输入并等待下一次交互（兼容旧接口）。"""
+
+    try:
+        await matcher.reject(await export(message, bot), **kwargs)
     except Exception as exc:
         if is_send_exception(exc):
             raise wrap_send_error(exc) from exc
@@ -140,10 +218,9 @@ async def send_group(
 ) -> bool:
     """向群聊发送主动消息。"""
 
-    return await _send(
-        "group",
-        int(group_id),
+    return await send(
         message,
+        target=ChatRef(scene="group", peer_id=int(group_id)),
         adapter=adapter,
         self_id=self_id,
     )
@@ -158,10 +235,9 @@ async def send_private(
 ) -> bool:
     """向私聊发送主动消息。"""
 
-    return await _send(
-        "private",
-        int(user_id),
+    return await send(
         message,
+        target=ChatRef(scene="private", peer_id=int(user_id)),
         adapter=adapter,
         self_id=self_id,
     )
@@ -176,6 +252,9 @@ async def send_to_chat(
 ) -> bool:
     """按 ChatRef 自动选择群聊/私聊发送。"""
 
-    if ref.scene == "group":
-        return await send_group(ref.peer_id, message, adapter=adapter, self_id=self_id)
-    return await send_private(ref.peer_id, message, adapter=adapter, self_id=self_id)
+    return await send(
+        message,
+        target=ref,
+        adapter=adapter,
+        self_id=self_id,
+    )

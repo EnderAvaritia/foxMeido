@@ -43,7 +43,7 @@ from plugins.db import get_backend
 from plugins import config as db_cfg
 from plugins.message_reaction import reaction_cleanup
 from plugins.playwright_utils import ensure_browser, create_context
-from plugins.protocol import SendError, plaintext, send_group, send_private
+from plugins.protocol import SendError, receive, send_group, send_private
 
 backend = get_backend()
 
@@ -742,7 +742,7 @@ async def handle_curator(bot, event):
     cleanup = await reaction_cleanup(bot, event)
 
     # 解析参数
-    raw_msg = plaintext(event)
+    raw_msg = receive(event).text
     args = raw_msg.strip().split()
     sub = args[1].lower() if len(args) > 1 else ""
     is_test = sub == "test"

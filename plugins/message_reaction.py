@@ -43,12 +43,7 @@ from typing import Any
 
 from nonebot.log import logger
 
-from plugins.protocol.identity import (
-    ChatRef,
-    MessageRef,
-    group_id as _group_id,
-    message_ref as _message_ref,
-)
+from plugins.protocol.identity import ChatRef, MessageRef, receive
 from plugins.protocol.reaction import get_reaction_ops
 
 # ── 项目根目录 ────────────────────────────────────────────────
@@ -115,14 +110,17 @@ def get_reaction_config() -> tuple[bool, str, bool]:
 def extract_group_id(event: Any) -> int | None:
     """从消息事件对象中提取群号；私聊返回 None。"""
 
-    return _group_id(event)
+    msg = receive(event)
+    return msg.group_id if msg is not None else None
 
 
 def extract_message_id(event: Any) -> int | None:
     """从消息事件对象中提取消息序号；非消息事件返回 None。"""
 
-    ref = _message_ref(event)
-    return ref.seq if ref else None
+    msg = receive(event)
+    if msg is None or msg.message is None:
+        return None
+    return msg.message.seq
 
 
 # ── 核心函数 ──────────────────────────────────────────────────
@@ -210,7 +208,8 @@ async def reaction_cleanup(
     Returns:
         移除表情的 async callable，如果禁用自动移除或提取失败返回 None
     """
-    ref = _message_ref(event)
+    msg = receive(event)
+    ref = msg.message if msg is not None else None
     if ref is None or ref.chat.scene != "group":
         return None
 

@@ -10,6 +10,7 @@ from nonebot_plugin_alconna import UniMessage
 from plugins.protocol import (
     ChatRef,
     MessageRef,
+    Received,
     SendError,
     chat_ref,
     export,
@@ -21,6 +22,7 @@ from plugins.protocol import (
     nickname,
     plaintext,
     plaintext_of,
+    receive,
     send,
     send_group,
     send_private,
@@ -116,6 +118,37 @@ def test_identity_milky_private():
     assert chat_ref(event) == ChatRef(scene="private", peer_id=20002)
 
 
+def test_receive_onebot_group():
+    received = receive(_ob11_event())
+    assert isinstance(received, Received)
+    assert received.adapter == "OneBot V11"
+    assert received.user_id == 10001
+    assert received.group_id == 20002
+    assert received.nickname == "alice"
+    assert received.text == "hello"
+    assert received.chat == ChatRef(scene="group", peer_id=20002)
+    assert received.message == MessageRef(
+        chat=ChatRef(scene="group", peer_id=20002), seq=333
+    )
+    assert received.is_group is True
+
+
+def test_receive_milky_private():
+    received = receive(_milky_event(scene="friend"))
+    assert isinstance(received, Received)
+    assert received.adapter == "Milky"
+    assert received.group_id is None
+    assert received.chat == ChatRef(scene="private", peer_id=20002)
+    assert received.message == MessageRef(
+        chat=ChatRef(scene="private", peer_id=20002), seq=444
+    )
+    assert received.is_group is False
+
+
+def test_receive_non_message_returns_none():
+    assert receive(SimpleNamespace(get_plaintext=lambda: "x")) is None
+
+
 def test_plaintext_falls_back_to_message():
     class Message:
         def extract_plain_text(self):
@@ -147,7 +180,7 @@ def test_send_wraps_known_adapter_error():
             raise ActionFailed(retcode=1200, message="failed")
 
     with pytest.raises(SendError) as exc_info:
-        asyncio.run(send(FailingMatcher(), "hi"))
+        asyncio.run(send("hi", matcher=FailingMatcher(), bot=_FakeBot("OneBot V11")))
     assert exc_info.value.retryable is True
     assert isinstance(exc_info.value.cause, ActionFailed)
 
@@ -161,7 +194,30 @@ def test_finish_rethrows_control_flow_exception():
             raise Stop
 
     with pytest.raises(Stop):
-        asyncio.run(finish(StoppingMatcher(), "hi"))
+        asyncio.run(finish(StoppingMatcher(), "hi", bot=_FakeBot("OneBot V11")))
+
+
+def test_send_matcher_branch():
+    class RecordingMatcher:
+        def __init__(self):
+            self.sent: list = []
+
+        async def send(self, message, **kwargs):
+            self.sent.append(message)
+
+    matcher = RecordingMatcher()
+    assert asyncio.run(send("hi", matcher=matcher, bot=_FakeBot("OneBot V11"))) is True
+    assert matcher.sent == ["hi"]
+
+
+def test_send_finish_requires_matcher():
+    with pytest.raises(ValueError):
+        asyncio.run(send("hi", finish=True))
+
+
+def test_send_non_message_event_without_target_raises():
+    with pytest.raises(ValueError):
+        asyncio.run(send("hi", event=SimpleNamespace(get_plaintext=lambda: "x")))
 
 
 def test_plaintext_of():

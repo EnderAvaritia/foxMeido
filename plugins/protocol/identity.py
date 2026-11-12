@@ -4,6 +4,12 @@ identity.py - 事件身份归一化
 把 OneBot V11 / Milky 等适配器的事件字段收敛成稳定的小接口，
 插件不再直接依赖 event.user_id / event.sender.nickname / event.group_id。
 
+统一接收入口：
+- ``receive(event)`` 把消息事件一次性归一化为 ``Received`` DTO；
+  非消息事件（notice / request / meta）返回 ``None``，不抛异常。
+- 原有的 ``user_id`` / ``group_id`` / ``nickname`` / ``plaintext`` /
+  ``chat_ref`` / ``message_ref`` 帮助函数保留，供 ``receive`` 和旧代码复用。
+
 支持的事件形态：
 - OneBot V11: event.user_id / event.group_id / event.message_id / event.sender
 - Milky:      event.data.sender_id / event.data.peer_id /
@@ -34,6 +40,25 @@ class MessageRef:
     chat: ChatRef
     seq: int
     """OneBot V11 为 message_id，Milky 为 message_seq。"""
+
+
+@dataclass(frozen=True)
+class Received:
+    """一条消息事件的协议中立视图。"""
+
+    adapter: str
+    self_id: str
+    user_id: int
+    group_id: int | None
+    nickname: str
+    text: str
+    chat: ChatRef
+    message: MessageRef | None
+    raw: Any
+
+    @property
+    def is_group(self) -> bool:
+        return self.chat.scene == "group"
 
 
 def _milky_data(event: Any) -> Any | None:
@@ -150,3 +175,33 @@ def is_group_event(event: Any) -> bool:
     """是否群聊事件。"""
 
     return chat_ref(event).scene == "group"
+
+
+def receive(event: Any) -> Received | None:
+    """把消息事件归一化为 ``Received``；非消息事件返回 ``None``。
+
+    只做一次识别和取值，避免插件在多个帮助函数间重复解析事件。
+    复用上面已有的帮助函数，保证解析逻辑只有一份。
+    """
+
+    if _milky_data(event) is not None:
+        adapter = "Milky"
+    elif (
+        getattr(event, "user_id", None) is not None
+        or callable(getattr(event, "get_user_id", None))
+    ):
+        adapter = "OneBot V11"
+    else:
+        return None
+
+    return Received(
+        adapter=adapter,
+        self_id=str(getattr(event, "self_id", "") or ""),
+        user_id=user_id(event),
+        group_id=group_id(event),
+        nickname=nickname(event),
+        text=plaintext(event),
+        chat=chat_ref(event),
+        message=message_ref(event),
+        raw=event,
+    )

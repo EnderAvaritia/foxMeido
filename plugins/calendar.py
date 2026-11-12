@@ -46,7 +46,7 @@ async def handle_function(bot, event, args: Message = CommandArg()):
     else:
         pic = '截图超时，请联系'
 
-    await send(calendar, pic)
+    await send(pic, matcher=calendar)
     if cleanup: await cleanup()
 
 async def take_screenshot():

@@ -5,7 +5,7 @@ from nonebot import on_startswith
 
 from plugins.playwright_utils import take_app_screenshot
 from plugins.message_reaction import reaction_cleanup
-from plugins.protocol import SendError, finish, image, plaintext, plaintext_of, send, text
+from plugins.protocol import SendError, image, plaintext, plaintext_of, send, text
 from plugins.steam_utils import get_game_info, get_header_image_bytes, get_popular_tags
 
 
@@ -38,20 +38,20 @@ async def send_message(goodId):
             await send_with_fallback(result)
     else:
         print("no_match")
-        await send(steamGoods, f"你确定\"{display_input}\"是商品的id？")
+        await send(f"你确定\"{display_input}\"是商品的id？", matcher=steamGoods)
 
 
 async def send_with_fallback(result):
     """发送结果消息：发图失败（rich media transfer failed 等）先重试一次，
     仍失败则去掉图片段降级为纯文本发送，避免整条消息丢失。"""
     try:
-        await send(steamGoods, result)
+        await send(result, matcher=steamGoods)
         return
     except SendError as e:
         print(f"[steamFinderAuto] 发送失败，重试一次: {e}")
         await asyncio.sleep(2)
         try:
-            await send(steamGoods, result)
+            await send(result, matcher=steamGoods)
             return
         except SendError as e2:
             print(f"[steamFinderAuto] 重试仍失败，降级为纯文本: {e2}")
@@ -59,7 +59,7 @@ async def send_with_fallback(result):
     # 降级：剔除图片段，仅发送文本
     plain = plaintext_of(result).strip()
     if plain:
-        await send(steamGoods, plain)
+        await send(plain, matcher=steamGoods)
 
 
 async def get_message(goodId):
@@ -103,7 +103,7 @@ async def get_message(goodId):
         pic_data = None
 
     if "error" in gameInfo:
-        await finish(steamGoods, f"游戏{goodId}数据获取出错，请反馈")
+        await send(f"游戏{goodId}数据获取出错，请反馈", matcher=steamGoods, finish=True)
     
     # 格式化价格
     if gameInfo.get("currency"):

@@ -135,10 +135,10 @@ def _get_current_command() -> str | None:
     try:
         from nonebot.internal.matcher import current_event
 
-        from plugins.protocol.identity import plaintext
+        from plugins.protocol.identity import receive
 
         event = current_event.get()
-        text = plaintext(event).strip()
+        text = receive(event).text.strip()
         if text:
             return text[:200]
     except Exception:  # noqa: BLE001 - 上下文未设置或解析失败，忽略

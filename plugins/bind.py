@@ -6,7 +6,7 @@ import re
 
 from plugins.db import get_backend
 from plugins.message_reaction import reaction_cleanup
-from plugins.protocol import nickname, plaintext, user_id
+from plugins.protocol import receive
 
 backend = get_backend()
 
@@ -16,12 +16,13 @@ bind = on_command("bind", aliases={"bind"}, priority=10, block=True)
 @bind.handle()
 async def handle_function(bot, event):
     cleanup = await reaction_cleanup(bot, event)
-    userId = str(user_id(event))
-    sender_name = nickname(event)
+    msg = receive(event)
+    userId = str(msg.user_id)
+    sender_name = msg.nickname
 
     record = backend.get_record("account", [("account", "eq", userId)])
 
-    message_text = plaintext(event)
+    message_text = msg.text
     steamid = re.findall(
         r"(?<=steamcommunity.com/profiles/)(\d+)|(\d{15,20})", message_text
     )

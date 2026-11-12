@@ -10,7 +10,7 @@ from plugins import config as cfg
 from plugins.db import get_backend
 from plugins.steam_utils import extract_steam_id, get_game_info
 from plugins.message_reaction import reaction_cleanup
-from plugins.protocol import user_id
+from plugins.protocol import receive
 
 backend = get_backend()
 
@@ -32,7 +32,7 @@ async def handle_function(bot, event, args: Message = CommandArg()):
             await get.finish(f"用户ID格式错误：{userId_str}")
     elif len(params) == 1:
         goodId_str = params[0]
-        userId = user_id(event)
+        userId = receive(event).user_id
     else:
         if cleanup: await cleanup()
         await get.finish(

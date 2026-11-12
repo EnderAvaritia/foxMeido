@@ -42,7 +42,7 @@ from plugins.message_reaction import reaction_cleanup
 from plugins.protocol import (
     SendError,
     group_id as event_group_id,
-    plaintext,
+    receive,
     send_group,
     send_private,
     user_id as event_user_id,
@@ -567,7 +567,7 @@ async def handleUpdate(bot, event):
     cleanup = await reaction_cleanup(bot, event)
 
     # 解析参数
-    raw_msg = plaintext(event)
+    raw_msg = receive(event).text
     args = raw_msg.strip().split()
     force = len(args) > 1 and args[1] == "force"
 
