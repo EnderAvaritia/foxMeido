@@ -40,6 +40,7 @@ from nonebot.params import CommandArg
 
 from plugins.env_utils import _env_bool, _read_dotenv
 from plugins.message_reaction import extract_group_id, reaction_cleanup
+from plugins.protocol import user_id
 
 # 项目根目录：此文件位于 plugins/，往上级 1 层
 _PROJECT_ROOT: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -200,17 +201,17 @@ async def handle_function(bot, event, args: Message = CommandArg()):
         await pi_cmd.finish("用法：pi <问题>，例：pi 帮我看下项目里有没有内存泄漏")
 
     group_id = extract_group_id(event)
-    user_id = int(getattr(event, "user_id", 0) or 0)
+    user_id_value = user_id(event)
 
-    denied = _authorize(group_id, user_id)
+    denied = _authorize(group_id, user_id_value)
     if denied:
         if cleanup:
             await cleanup()
         await pi_cmd.finish(denied)
 
-    sid = _session_id(group_id, user_id)
+    sid = _session_id(group_id, user_id_value)
 
-    await pi_cmd.send("🧠 pi 处理中…（agent 模式，可能需要较久）", at_sender=False)
+    await pi_cmd.send("🧠 pi 处理中…（agent 模式，可能需要较久）")
 
     try:
         lock = _get_lock(sid)

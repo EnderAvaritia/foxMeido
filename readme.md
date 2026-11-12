@@ -7,12 +7,8 @@
 ### 安装依赖
 
 ```bash
-pip install requests beautifulsoup4 playwright httpx lxml
+pip install -r requirements.txt
 playwright install chromium
-
-# NoneBot 插件
-nb plugin install nonebot-plugin-alconna
-nb plugin install nonebot_plugin_apscheduler
 ```
 
 ### 配置
@@ -56,6 +52,41 @@ HOST=127.0.0.1
 PORT=26657
 COMMAND_START=[""] 
 ```
+
+### 多协议（OneBot V11 / Milky）
+
+插件通过 `plugins/protocol/` 使用协议无关接口：消息构建/发送、用户/群/昵称/消息引用、表情回应、主动推送。新增协议时只需要在 `plugins/protocol/` 增加能力实现，业务插件不用改 import。
+
+当前支持：
+
+| 协议 | 适配器 | 协议端示例 |
+|------|--------|-----------|
+| OneBot V11 | `nonebot-adapter-onebot` | NapCat、LLBot |
+| Milky | `nonebot-adapter-milky` | LLBot、Lagrange.Milky、Yogurt |
+
+> **重要：** 同一个 QQ 号不能在同一 NoneBot 进程里同时连接 OneBot V11 和 Milky。NoneBot 会因 `self_id` 重复抛 `RuntimeError`。用 `PROTOCOL_PRIMARY` 选择当前启用的协议端；主动消息（定时推送 / git pull 通知）也会按它选择 Bot。
+
+迁移期建议用 LLBot 同时开 OB11 + Milky 端点，但 NoneBot 一次只连一个；先用独立测试账号/群验证 Milky 的收发、图片、表情和定时推送，再把 `PROTOCOL_PRIMARY` 切到 `milky`。
+
+```env
+# 当前启用的协议端：onebot_v11 | milky
+PROTOCOL_PRIMARY=onebot_v11
+# 可选，进一步限定 Bot 的 self_id
+# PROTOCOL_SELF_ID=
+
+# Milky 协议端 HTTP + WebSocket 地址（与 OneBot 二选一同时连接）
+MILKY_CLIENTS='
+[
+  {
+    "host": "127.0.0.1",
+    "port": 3010,
+    "access_token": "",
+    "secure": false
+  }
+]'
+```
+
+Milky 适配器要求 **Python >= 3.10**、**NoneBot >= 2.4.2**；本项目已按此版本声明依赖。
 
 ### 数据库（可选）
 
@@ -423,6 +454,7 @@ foxMeido/
 └── plugins/
     ├── env_utils.py        # 环境变量读取、代理配置（通用工具）
     ├── config.py           # 全局配置中心（读取 .env：DB/Steam/代理/PRICE_REGIONS）
+    ├── protocol/           # 协议中立层（消息 / 身份 / 表情 / 主动推送）
     ├── steam_utils.py      # Steam 通用工具
     ├── curator_monitor.py# Steam 鉴赏家副本监控
     ├── finder.py         # 通用页面截图

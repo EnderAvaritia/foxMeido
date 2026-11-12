@@ -1,13 +1,8 @@
-import re
-import base64
-
 import requests
 from bs4 import BeautifulSoup
 from nonebot import on_command
 from nonebot.adapters import Message
 
-from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
-# from nonebot.adapters.qq import MessageSegment
 from nonebot.params import CommandArg
 from nonebot.rule import to_me
 from playwright.async_api import async_playwright
@@ -17,6 +12,7 @@ from playwright.async_api import TimeoutError as PlaywrightTimeout
 from plugins import config as cfg
 from plugins.playwright_utils import load_cookie_file, get_headless, is_playwright_enabled
 from plugins.message_reaction import reaction_cleanup
+from plugins.protocol import image, send
 
 
 browser = None
@@ -46,11 +42,11 @@ async def handle_function(bot, event, args: Message = CommandArg()):
     pic_data = await take_screenshot()
         
     if pic_data:
-        pic = MessageSegment.image(f"base64://{base64.b64encode(pic_data).decode()}")
+        pic = image(raw=pic_data)
     else:
         pic = '截图超时，请联系'
-    
-    await calendar.send(message=pic, at_sender=False)
+
+    await send(calendar, pic)
     if cleanup: await cleanup()
 
 async def take_screenshot():

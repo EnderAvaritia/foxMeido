@@ -82,7 +82,7 @@ async def handle_function(bot, event, args: Message = CommandArg()):
             if data.get("name"):
                 await price_cmd.finish(f"{data['name']}（AppID {appid}）：{reason}")
             await price_cmd.finish(f"AppID {appid}：{reason}")
-        await price_cmd.send(message=_format_result(data), at_sender=False)
+        await price_cmd.send(message=_format_result(data))
     finally:
         if cleanup:
             await cleanup()

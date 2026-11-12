@@ -33,7 +33,7 @@ from typing import Any
 import requests
 from bs4 import BeautifulSoup
 
-from nonebot import require, get_bot, on_startswith
+from nonebot import require, on_startswith
 from nonebot.plugin import on_command
 from nonebot.log import logger
 from nonebot.exception import FinishedException
@@ -43,6 +43,7 @@ from plugins.db import get_backend
 from plugins import config as db_cfg
 from plugins.message_reaction import reaction_cleanup
 from plugins.playwright_utils import ensure_browser, create_context
+from plugins.protocol import SendError, plaintext, send_group, send_private
 
 backend = get_backend()
 
@@ -716,18 +717,22 @@ def _split_ids(raw: str) -> list[str]:
 async def send_to_group(group_id: str, message: str) -> None:
     """向指定 QQ 群发送消息。"""
     try:
-        bot = get_bot()
-        await bot.call_api("send_group_msg", group_id=int(group_id), message=message)
-    except Exception as e:
+        if not await send_group(int(group_id), message):
+            logger.warning(f"没有可用 Bot 发送群消息 (group={group_id})")
+    except (TypeError, ValueError) as e:
+        logger.error(f"发送群消息失败 (group={group_id}): 群号格式错误: {e}")
+    except SendError as e:
         logger.error(f"发送群消息失败 (group={group_id}): {e}")
 
 
 async def send_to_user(user_id: str, message: str) -> None:
     """向指定 QQ 用户发送私聊消息。"""
     try:
-        bot = get_bot()
-        await bot.call_api("send_private_msg", user_id=int(user_id), message=message)
-    except Exception as e:
+        if not await send_private(int(user_id), message):
+            logger.warning(f"没有可用 Bot 发送私聊消息 (user={user_id})")
+    except (TypeError, ValueError) as e:
+        logger.error(f"发送私聊消息失败 (user={user_id}): QQ 号格式错误: {e}")
+    except SendError as e:
         logger.error(f"发送私聊消息失败 (user={user_id}): {e}")
 
 
@@ -737,7 +742,7 @@ async def handle_curator(bot, event):
     cleanup = await reaction_cleanup(bot, event)
 
     # 解析参数
-    raw_msg = event.get_plaintext() if hasattr(event, "get_plaintext") else str(event)
+    raw_msg = plaintext(event)
     args = raw_msg.strip().split()
     sub = args[1].lower() if len(args) > 1 else ""
     is_test = sub == "test"
@@ -755,26 +760,25 @@ async def handle_curator(bot, event):
                 "⚠️ 数据库已有记录，疑似非首次初始化。\n"
                 "若确要重新建立基线（会把当前待处理游戏全部设为历史），"
                 "请使用 pending init force",
-                at_sender=False,
             )
         try:
             result = await run_check(init=True)
             cfg = get_config()
             if cleanup: await cleanup()
             await curator_cmd.finish(
-                format_result(result, cfg["curator_name"]), at_sender=False)
+                format_result(result, cfg["curator_name"]))
         except CookieExpiredError as e:
             if cleanup: await cleanup()
-            await curator_cmd.finish(f"❌ {e}", at_sender=False)
+            await curator_cmd.finish(f"❌ {e}")
         except requests.RequestException as e:
             if cleanup: await cleanup()
-            await curator_cmd.finish(f"❌ 网络请求失败: {e}", at_sender=False)
+            await curator_cmd.finish(f"❌ 网络请求失败: {e}")
         except FinishedException:
             raise
         except Exception as e:
             logger.exception("初始化异常")
             if cleanup: await cleanup()
-            await curator_cmd.finish(f"❌ 初始化异常: {e}", at_sender=False)
+            await curator_cmd.finish(f"❌ 初始化异常: {e}")
 
     if is_test:
         cfg = get_config()
@@ -784,7 +788,7 @@ async def handle_curator(bot, event):
             f"鉴赏家: {cfg['curator_name']}\n"
             f"此消息表示推送配置正常"
         )
-        await curator_cmd.send(test_msg, at_sender=False)
+        await curator_cmd.send(test_msg)
 
         # ntfy 测试（如果有配置）
         ntfy_topic = cfg.get("ntfy_topic", "")
@@ -793,11 +797,10 @@ async def handle_curator(bot, event):
             if cleanup: await cleanup()
             await curator_cmd.finish(
                 f"ntfy 推送{'✅ 成功' if ok else '❌ 失败'}",
-                at_sender=False,
             )
         else:
             if cleanup: await cleanup()
-            await curator_cmd.finish("ntfy 未配置，仅发送了 QQ 消息", at_sender=False)
+            await curator_cmd.finish("ntfy 未配置，仅发送了 QQ 消息")
 
     # 执行检查（不再发"正在检查"，✅表情即为响应）
     try:
@@ -805,19 +808,19 @@ async def handle_curator(bot, event):
         cfg = get_config()
         msg = format_result(result, cfg["curator_name"])
         if cleanup: await cleanup()
-        await curator_cmd.finish(msg, at_sender=False)
+        await curator_cmd.finish(msg)
     except CookieExpiredError as e:
         if cleanup: await cleanup()
-        await curator_cmd.finish(f"❌ {e}", at_sender=False)
+        await curator_cmd.finish(f"❌ {e}")
     except requests.RequestException as e:
         if cleanup: await cleanup()
-        await curator_cmd.finish(f"❌ 网络请求失败: {e}", at_sender=False)
+        await curator_cmd.finish(f"❌ 网络请求失败: {e}")
     except FinishedException:
         raise
     except Exception as e:
         logger.exception("检查异常")
         if cleanup: await cleanup()
-        await curator_cmd.finish(f"❌ 检查异常: {e}", at_sender=False)
+        await curator_cmd.finish(f"❌ 检查异常: {e}")
 
 
 # ── 定时任务：每日推送 ────────────────────────────────────────────

@@ -35,7 +35,7 @@ async def send_message(publisher):
     if publisher != [] and publisher != "":
         result = await get_message(publisher)
         if result:
-            await steamPublishersAuto.send(message=result, at_sender=False)
+            await steamPublishersAuto.send(message=result)
     else:
         print("no_match")
         await steamPublishersAuto.send("你确定这是发行商的页面？")

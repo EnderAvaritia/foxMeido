@@ -30,8 +30,9 @@ message_reaction.py - 消息表情回复模块
     MESSAGE_REACTION_FACE_ID  - QQ 表情 ID（默认 32=✅）
 
 支持的协议端：
-    - NapCat QQ（set_msg_emoji_like API）
-    不支持的协议端自动忽略，不会报错。
+    - OneBot V11（NapCat 的 set_msg_emoji_like）
+    - Milky（send_group_message_reaction）
+    不支持时自动忽略，不会报错。是否支持由 plugins.protocol.reaction 按 Bot 判断。
 """
 
 from __future__ import annotations
@@ -41,6 +42,14 @@ import re
 from typing import Any
 
 from nonebot.log import logger
+
+from plugins.protocol.identity import (
+    ChatRef,
+    MessageRef,
+    group_id as _group_id,
+    message_ref as _message_ref,
+)
+from plugins.protocol.reaction import get_reaction_ops
 
 # ── 项目根目录 ────────────────────────────────────────────────
 # 此文件位于 plugins/ 下，往上级 2 层
@@ -100,51 +109,23 @@ def get_reaction_config() -> tuple[bool, str, bool]:
     return enabled, face_id, auto_remove
 
 
-# ── 事件提取工具 ──────────────────────────────────────────────
+# ── 事件提取工具（保留旧接口，内部走协议中立层） ────────────────
 
 
 def extract_group_id(event: Any) -> int | None:
-    """从消息事件对象中提取群号。
+    """从消息事件对象中提取群号；私聊返回 None。"""
 
-    兼容 OneBot V11 GroupMessageEvent 和 QQ 适配器 GroupEvent。
-    """
-    # OneBot V11: event.group_id (int)
-    group_id = getattr(event, "group_id", None)
-    if group_id is not None:
-        return int(group_id) if not isinstance(group_id, int) else group_id
-    # QQ 适配器: event.group.group_id / event.group_openid
-    group = getattr(event, "group", None) or getattr(event, "group_openid", None)
-    if group is not None:
-        gid = getattr(group, "group_id", None) or getattr(group, "id", None)
-        if gid is not None:
-            return int(gid) if not isinstance(gid, int) else gid
-    return None
+    return _group_id(event)
 
 
-def extract_message_id(event: Any) -> int | str | None:
-    """从消息事件对象中提取消息 ID。
+def extract_message_id(event: Any) -> int | None:
+    """从消息事件对象中提取消息序号；非消息事件返回 None。"""
 
-    兼容 OneBot V11 和 QQ 适配器。
-    """
-    # OneBot V11: event.message_id (int)
-    msg_id = getattr(event, "message_id", None)
-    if msg_id is not None:
-        return msg_id
-    # QQ 适配器: event.id (str)
-    msg_id = getattr(event, "id", None)
-    if msg_id is not None:
-        return msg_id
-    # event.data (部分适配器)
-    data = getattr(event, "data", None)
-    if data is not None:
-        return getattr(data, "message_id", None) or getattr(data, "id", None)
-    return None
+    ref = _message_ref(event)
+    return ref.seq if ref else None
 
 
 # ── 核心函数 ──────────────────────────────────────────────────
-
-# 协议端不支持时的缓存标记，避免每条消息都报错
-_API_UNSUPPORTED: bool = False
 
 
 async def send_reaction(
@@ -160,48 +141,38 @@ async def send_reaction(
     Args:
         bot: NoneBot Bot 实例
         group_id: 群号
-        message_id: 消息 ID
+        message_id: 消息序号（OneBot V11 的 message_id / Milky 的 message_seq）
         face_id: QQ 表情 ID。为 None 时使用 .env 中配置的默认值
         is_add: True=添加，False=移除
 
     Returns:
-        bool: 是否成功发送（False 表示协议端不支持）
+        bool: 是否成功发送（False 表示协议端不支持或不是群聊）
     """
-    global _API_UNSUPPORTED
-
-    if _API_UNSUPPORTED:
-        return False
-
     if face_id is None:
         _, face_id, _ = get_reaction_config()
 
     try:
-        await bot.call_api(
-            "set_msg_emoji_like",
-            message_id=str(message_id),
-            emoji_id=str(face_id),
-            set=is_add,
-        )
+        seq = int(message_id)
+    except (TypeError, ValueError):
+        logger.warning("表情回复的 message_id 不是整数: {!r}", message_id)
+        return False
+
+    ref = MessageRef(chat=ChatRef(scene="group", peer_id=int(group_id)), seq=seq)
+    ops = get_reaction_ops(bot)
+    if not ops.supports(ref):
+        return False
+
+    if is_add:
+        ok = await ops.add(ref, str(face_id))
+    else:
+        ok = await ops.remove(ref, str(face_id))
+
+    if ok:
         action = "添加" if is_add else "移除"
         logger.opt(colors=True).debug(
             f"<green>✓</green> 已{action}表情回复 group={group_id} msg={message_id} face={face_id}"
         )
-        return True
-    except Exception as e:
-        msg = str(e)
-        # retcode=1404 = 不支持的API，标记后不再重试
-        if "1404" in msg:
-            _API_UNSUPPORTED = True
-            logger.opt(colors=True).warning(
-                f"<yellow>✗</yellow> 协议端不支持 set_msg_emoji_like，"
-                f"已自动禁用表情回复功能"
-            )
-        else:
-            logger.opt(colors=True).warning(
-                f"<yellow>✗</yellow> 表情回复失败 group={group_id} msg={message_id} "
-                f"face={face_id} is_add={is_add}: {type(e).__name__}: {e}"
-            )
-        return False
+    return ok
 
 
 async def remove_reaction(
@@ -239,18 +210,18 @@ async def reaction_cleanup(
     Returns:
         移除表情的 async callable，如果禁用自动移除或提取失败返回 None
     """
-    group_id = extract_group_id(event)
-    message_id = extract_message_id(event)
-    if not group_id or not message_id:
+    ref = _message_ref(event)
+    if ref is None or ref.chat.scene != "group":
         return None
 
-    await send_reaction(bot, group_id, message_id, face_id)
+    if not await send_reaction(bot, ref.chat.peer_id, ref.seq, face_id):
+        return None
 
     _, _, auto_remove = get_reaction_config()
     if not auto_remove:
         return None
 
     async def _remove():
-        await remove_reaction(bot, group_id, message_id, face_id)
+        await remove_reaction(bot, ref.chat.peer_id, ref.seq, face_id)
 
     return _remove

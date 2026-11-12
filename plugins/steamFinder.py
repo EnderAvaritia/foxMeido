@@ -44,7 +44,7 @@ async def send_message(goodId):
     if goodId != [] and goodId != "":
         result = await get_message(goodId)
         if result:
-            await steamGoods.send(message=result, at_sender=False)
+            await steamGoods.send(message=result)
     else:
         print("no_match")
         await steamGoods.send(f"你确定\"{display_input}\"是商品的id？")

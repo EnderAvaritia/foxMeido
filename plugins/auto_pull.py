@@ -33,12 +33,20 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
-from nonebot import require, get_bot, get_driver
+from nonebot import require, get_driver
 from nonebot.exception import FinishedException
 from nonebot.log import logger
 from nonebot.plugin import on_command
 
-from plugins.message_reaction import reaction_cleanup, extract_group_id
+from plugins.message_reaction import reaction_cleanup
+from plugins.protocol import (
+    SendError,
+    group_id as event_group_id,
+    plaintext,
+    send_group,
+    send_private,
+    user_id as event_user_id,
+)
 
 require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler  # noqa: E402
@@ -341,18 +349,23 @@ def writeUpdateLock(
     old_head: str,
     trigger_group_id: int | None,
     trigger_user_id: int | None = None,
+    trigger_adapter: str | None = None,
+    trigger_self_id: str | None = None,
 ) -> None:
     """在退出前把更新状态落盘，重启后 on_bot_connect 会补发通知。
 
     trigger_group_id / trigger_user_id 记录触发来源：群聊触发记群号，
     私聊触发记用户 QQ，重启后据此补发更新完成通知，保证触发者一定能
-    收到结果。
+    收到结果。trigger_adapter / trigger_self_id 记录触发时的协议端，
+    避免多协议环境下由错误的 Bot 补发。
     """
     payload = {
         "start_time": time.time(),
         "old_head": old_head,
         "trigger_group_id": trigger_group_id,
         "trigger_user_id": trigger_user_id,
+        "trigger_adapter": trigger_adapter,
+        "trigger_self_id": trigger_self_id,
     }
     lock_path = BASE_DIR / ".lock"
     try:
@@ -366,29 +379,62 @@ def writeUpdateLock(
 
 
 @get_driver().on_bot_connect
-async def onBotConnect() -> None:
+async def onBotConnect(bot) -> None:
     """机器人连接成功后：若存在 .lock 说明上次更新触发了退出，补发完成通知。"""
     lock_path = BASE_DIR / ".lock"
     if not lock_path.is_file():
         return
     try:
         payload = json.loads(lock_path.read_text(encoding="utf-8"))
-        lock_path.unlink(missing_ok=True)
         start_time = float(payload.get("start_time") or 0)
         old_head = str(payload.get("old_head") or "")
         group_id = payload.get("trigger_group_id")
         user_id = payload.get("trigger_user_id")
+        trigger_adapter = payload.get("trigger_adapter")
+        trigger_self_id = payload.get("trigger_self_id")
+
+        adapter_name = bot.adapter.get_name()
+        if trigger_adapter and adapter_name != trigger_adapter:
+            logger.info(
+                "更新完成通知等待协议端 {} 连接后再发送（当前 {}）",
+                trigger_adapter,
+                adapter_name,
+            )
+            return
+        if trigger_self_id and str(bot.self_id) != str(trigger_self_id):
+            logger.info(
+                "更新完成通知等待 self_id={} 连接后再发送（当前 {}）",
+                trigger_self_id,
+                bot.self_id,
+            )
+            return
 
         elapsed = int(time.time() - start_time) if start_time else 0
         commits = getCommitLog(old_head, getCurrentHead())
         message = f"✅ 更新完成！用时 {elapsed} 秒\n{commits}"
 
         if group_id:
-            await sendToGroup(str(group_id), message)
+            sent = await sendToGroup(
+                str(group_id),
+                message,
+                adapter=trigger_adapter,
+                self_id=trigger_self_id,
+            )
         elif user_id:
-            await sendToUser(str(user_id), message)
+            sent = await sendToUser(
+                str(user_id),
+                message,
+                adapter=trigger_adapter,
+                self_id=trigger_self_id,
+            )
         else:
             logger.info("更新完成，但无触发群/用户信息，未发送通知: {}", message)
+            sent = True
+
+        if sent:
+            lock_path.unlink(missing_ok=True)
+        else:
+            logger.warning("更新完成通知发送失败，保留 .lock 等待下次连接重试")
     except Exception as e:
         # 恢复失败不能影响 bot 正常运行
         logger.warning("发送更新完成通知失败: {}", e)
@@ -443,32 +489,48 @@ async def _safeFinish(matcher, message: str, **kwargs) -> None:
         logger.warning("发送最终消息失败: {}", e)
 
 
-async def sendToGroup(group_id: str, message: str) -> None:
+async def sendToGroup(
+    group_id: str,
+    message: str,
+    *,
+    adapter: str | None = None,
+    self_id: str | None = None,
+) -> bool:
     """向指定 QQ 群发送消息。"""
     try:
-        bot = get_bot()
-        await asyncio.wait_for(
-            bot.call_api("send_group_msg", group_id=int(group_id), message=message),
+        return await asyncio.wait_for(
+            send_group(int(group_id), message, adapter=adapter, self_id=self_id),
             timeout=SEND_TIMEOUT,
         )
     except (asyncio.TimeoutError, TimeoutError):
         logger.warning("发送群消息超时 (group={}): 连接可能在重载中被关闭", group_id)
-    except Exception as e:
+    except (TypeError, ValueError) as e:
+        logger.error("发送群消息失败 (group={}): 群号格式错误: {}", group_id, e)
+    except SendError as e:
         logger.error("发送群消息失败 (group={}): {}", group_id, e)
+    return False
 
 
-async def sendToUser(user_id: str, message: str) -> None:
+async def sendToUser(
+    user_id: str,
+    message: str,
+    *,
+    adapter: str | None = None,
+    self_id: str | None = None,
+) -> bool:
     """向指定 QQ 用户私聊发送消息。"""
     try:
-        bot = get_bot()
-        await asyncio.wait_for(
-            bot.call_api("send_private_msg", user_id=int(user_id), message=message),
+        return await asyncio.wait_for(
+            send_private(int(user_id), message, adapter=adapter, self_id=self_id),
             timeout=SEND_TIMEOUT,
         )
     except (asyncio.TimeoutError, TimeoutError):
         logger.warning("发送私聊消息超时 (user={}): 连接可能在重载中被关闭", user_id)
-    except Exception as e:
+    except (TypeError, ValueError) as e:
+        logger.error("发送私聊消息失败 (user={}): QQ 号格式错误: {}", user_id, e)
+    except SendError as e:
         logger.error("发送私聊消息失败 (user={}): {}", user_id, e)
+    return False
 
 
 async def sendNotification(message: str) -> None:
@@ -505,7 +567,7 @@ async def handleUpdate(bot, event):
     cleanup = await reaction_cleanup(bot, event)
 
     # 解析参数
-    raw_msg = event.get_plaintext() if hasattr(event, "get_plaintext") else str(event)
+    raw_msg = plaintext(event)
     args = raw_msg.strip().split()
     force = len(args) > 1 and args[1] == "force"
 
@@ -516,17 +578,19 @@ async def handleUpdate(bot, event):
         if not has_update:
             result = f"✅ {msg}"
             await _safeCleanup(cleanup)
-            await _safeFinish(update_cmd, result, at_sender=False)
+            await _safeFinish(update_cmd, result)
             return
 
         # 先落盘更新标记：重启后 onBotConnect 会据此补发完成通知，
         # 避免“消息发一半进程被强杀 / 重启后无任何反馈”。
-        group_id = extract_group_id(event)
-        user_id = getattr(event, "user_id", None)
+        group_id = event_group_id(event)
+        user_id = event_user_id(event)
         writeUpdateLock(
             old_head=old_head,
             trigger_group_id=group_id,
             trigger_user_id=user_id,
+            trigger_adapter=bot.adapter.get_name(),
+            trigger_self_id=str(bot.self_id),
         )
 
         # 发送成功消息，再清理表情、缓冲后退出
@@ -542,7 +606,7 @@ async def handleUpdate(bot, event):
         # 重启后 onBotConnect 会补发完成通知。因此发送失败只记日志，绝不
         # 走进 except 分支误报「命令异常」（否则错误通知本身也发不出去，
         # 只会留下难看的双份堆栈并拖慢整个重载流程）。
-        sent = await _safeSend(update_cmd, result, at_sender=False)
+        sent = await _safeSend(update_cmd, result)
         if not sent:
             logger.warning(
                 "更新通知未能送达（连接可能在重载中被关闭），"
@@ -562,7 +626,7 @@ async def handleUpdate(bot, event):
     except Exception as e:
         logger.exception("update 命令异常")
         await _safeCleanup(cleanup)
-        await _safeFinish(update_cmd, f"❌ 命令异常: {e}", at_sender=False)
+        await _safeFinish(update_cmd, f"❌ 命令异常: {e}")
         return
 
 

@@ -1,7 +1,6 @@
 from nonebot import on_command
 from nonebot.adapters import Message
 from nonebot.params import CommandArg
-from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
 
 import datetime
 import json
@@ -11,6 +10,7 @@ from plugins import config as cfg
 from plugins.db import get_backend
 from plugins.steam_utils import extract_steam_id, get_game_info
 from plugins.message_reaction import reaction_cleanup
+from plugins.protocol import user_id
 
 backend = get_backend()
 
@@ -18,7 +18,7 @@ get = on_command("get", aliases={"get"}, priority=10, block=True)
 
 
 @get.handle()
-async def handle_function(bot: Bot, event: MessageEvent, args: Message = CommandArg()):
+async def handle_function(bot, event, args: Message = CommandArg()):
     cleanup = await reaction_cleanup(bot, event)
     args_str = args.extract_plain_text().strip()
     params = args_str.split()
@@ -30,11 +30,9 @@ async def handle_function(bot: Bot, event: MessageEvent, args: Message = Command
             userId = int(userId_str)
         except ValueError:
             await get.finish(f"用户ID格式错误：{userId_str}")
-        nickname = event.sender.nickname
     elif len(params) == 1:
         goodId_str = params[0]
-        userId = event.user_id
-        nickname = event.sender.nickname
+        userId = user_id(event)
     else:
         if cleanup: await cleanup()
         await get.finish(

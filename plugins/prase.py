@@ -19,5 +19,5 @@ async def handle_function(bot, event, message: Message = CommandArg()):
         word = re.findall(r'(?<=app/)(\d+)', word)
         if word != [] and word != "":
             print(word)
-            await prase.send(message=word,at_sender=False)
+            await prase.send(message=word)
     if cleanup: await cleanup()

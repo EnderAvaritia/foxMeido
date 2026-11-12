@@ -1,14 +1,11 @@
 import asyncio
 import re
-import base64
-
-from nonebot.adapters.onebot.v11 import Bot, MessageEvent, MessageSegment
-from nonebot.adapters.onebot.v11.exception import ActionFailed
 
 from nonebot import on_startswith
 
 from plugins.playwright_utils import take_app_screenshot
 from plugins.message_reaction import reaction_cleanup
+from plugins.protocol import SendError, finish, image, plaintext, plaintext_of, send, text
 from plugins.steam_utils import get_game_info, get_header_image_bytes, get_popular_tags
 
 
@@ -19,7 +16,7 @@ steamGoods = on_startswith(("https://store.steampowered.com/app/"), ignorecase=F
 async def handle_function(bot, event):
     cleanup = await reaction_cleanup(bot, event)
     try:
-        goodIds = event.get_plaintext()
+        goodIds = plaintext(event)
         goodIds = goodIds.split()
         for goodId in goodIds:
             if not (goodId.startswith("https://store.steampowered.com/app/") or goodId.isdigit()):
@@ -41,29 +38,28 @@ async def send_message(goodId):
             await send_with_fallback(result)
     else:
         print("no_match")
-        await steamGoods.send(f"你确定\"{display_input}\"是商品的id？")
+        await send(steamGoods, f"你确定\"{display_input}\"是商品的id？")
 
 
 async def send_with_fallback(result):
     """发送结果消息：发图失败（rich media transfer failed 等）先重试一次，
     仍失败则去掉图片段降级为纯文本发送，避免整条消息丢失。"""
     try:
-        await steamGoods.send(message=result, at_sender=False)
+        await send(steamGoods, result)
         return
-    except ActionFailed as e:
+    except SendError as e:
         print(f"[steamFinderAuto] 发送失败，重试一次: {e}")
         await asyncio.sleep(2)
         try:
-            await steamGoods.send(message=result, at_sender=False)
+            await send(steamGoods, result)
             return
-        except ActionFailed as e2:
+        except SendError as e2:
             print(f"[steamFinderAuto] 重试仍失败，降级为纯文本: {e2}")
 
     # 降级：剔除图片段，仅发送文本
-    if hasattr(result, "extract_plain_text"):
-        plain = result.extract_plain_text().strip()
-        if plain:
-            await steamGoods.send(message=plain, at_sender=False)
+    plain = plaintext_of(result).strip()
+    if plain:
+        await send(steamGoods, plain)
 
 
 async def get_message(goodId):
@@ -107,7 +103,7 @@ async def get_message(goodId):
         pic_data = None
 
     if "error" in gameInfo:
-        await steamGoods.finish(f"游戏{goodId}数据获取出错，请反馈")
+        await finish(steamGoods, f"游戏{goodId}数据获取出错，请反馈")
     
     # 格式化价格
     if gameInfo.get("currency"):
@@ -121,14 +117,14 @@ async def get_message(goodId):
         price_format = ""
     
     if pic_data:
-        pic = MessageSegment.image(f"base64://{base64.b64encode(pic_data).decode()}")
+        pic = image(raw=pic_data)
     else:
         # 截图失败时从 Steam API 下载封面图作为回落（内嵌 base64，避免 QQ 拉不到 CDN）
         fallback_bytes = await asyncio.to_thread(get_header_image_bytes, appid)
         if fallback_bytes:
-            pic = MessageSegment.image(f"base64://{base64.b64encode(fallback_bytes).decode()}")
+            pic = image(raw=fallback_bytes)
         else:
-            pic = '\n（截图获取失败，请点链接查看）'
+            pic = None
     
     # 条件构建输出行，缺失信息不输出对应行
     lines = []
@@ -149,7 +145,10 @@ async def get_message(goodId):
     if gameInfo.get("region_note"):
         lines.append(f'注：{gameInfo["region_note"]}')
     lines.append(f'Steam商店页链接：https://store.steampowered.com/app/{appid}')
-    return '\n'.join(lines) + '\n' + pic        
+    body = text("\n".join(lines))
+    if pic is not None:
+        return body + text("\n") + pic
+    return body + text("\n（截图获取失败，请点链接查看）")
 
 # async def fetch_title(url: str) -> str:
     # proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}

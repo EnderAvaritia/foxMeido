@@ -26,7 +26,7 @@ async def handle_function(bot, event, args: Message = CommandArg()):
     # goodId = args.extract_plain_text()
     # goodIdList = goodId.split()
     # message = "\n".join(goodIdList)
-    # await finder.send(message,at_sender=False)
+    # await finder.send(message)
     
     url = args.extract_plain_text()
     print(url)

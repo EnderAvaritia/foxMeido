@@ -88,7 +88,7 @@ async def get_message(name, cleanup=None):
         if response.status_code != 200:
             print("请求失败")
             if cleanup: await cleanup()
-            await steam_searcher.finish("请求失败", at_sender=False)
+            await steam_searcher.finish("请求失败")
 
         print("请求成功")
         content = response.text
@@ -102,7 +102,7 @@ async def get_message(name, cleanup=None):
     items = tree.xpath('//a[@data-gpnav="item"]')
     if not items or len(items) == 0:
         if cleanup: await cleanup()
-        await steam_searcher.finish("什么都找不到呢", at_sender=False)
+        await steam_searcher.finish("什么都找不到呢")
         return
 
     game_titles = []
@@ -117,7 +117,7 @@ async def get_message(name, cleanup=None):
     # 发送游戏列表
     search_result = "搜索结果：\n" + "\n".join(game_titles)
     print(search_result)
-    await steam_searcher.send(search_result, at_sender=False)
+    await steam_searcher.send(search_result)
     # 存储链接到会话
     steam_searcher.set_path_arg("game_links", game_links)
 
@@ -130,7 +130,7 @@ async def get_choice(number: int):
         if cleanup: await cleanup()
         await steam_searcher.finish("已退出")
     elif not game_links or number < 1 or number > len(game_links):
-        await steam_searcher.reject("无效的选择，请重试", at_sender=False)
+        await steam_searcher.reject("无效的选择，请重试")
         return
     link = game_links[number - 1]
     # 从 URL 如 https://store.steampowered.com/app/12345/ 中提取 appid
@@ -140,7 +140,7 @@ async def get_choice(number: int):
         appid = parts[appid_idx + 1]
     except (ValueError, IndexError):
         if cleanup: await cleanup()
-        await steam_searcher.finish("无效的链接", at_sender=False)
+        await steam_searcher.finish("无效的链接")
         return
 
     # 并发执行信息请求与截图，总耗时取两者最大值而非串行之和
@@ -160,7 +160,7 @@ async def get_choice(number: int):
 
     if "error" in gameInfo:
         if cleanup: await cleanup()
-        await steam_searcher.finish(f"游戏{appid}数据获取出错，请反馈", at_sender=False)
+        await steam_searcher.finish(f"游戏{appid}数据获取出错，请反馈")
 
     # 格式化价格
     if gameInfo.get("currency"):
@@ -197,14 +197,14 @@ async def get_choice(number: int):
     if screenshot_bytes:
         pic = UniMessage.image(raw=screenshot_bytes)
         if cleanup: await cleanup()
-        await steam_searcher.finish(message=info_text + "\n" + pic, at_sender=False)
+        await steam_searcher.finish(message=info_text + "\n" + pic)
     else:
         # 截图失败时从 Steam API 下载封面图作为回落（内嵌 base64，避免 QQ 拉不到 CDN）
         fallback_bytes = await asyncio.to_thread(get_header_image_bytes, appid)
         if fallback_bytes:
             pic = UniMessage.image(raw=fallback_bytes)
             if cleanup: await cleanup()
-            await steam_searcher.finish(message=info_text + "\n" + pic, at_sender=False)
+            await steam_searcher.finish(message=info_text + "\n" + pic)
         else:
             if cleanup: await cleanup()
-            await steam_searcher.finish(message=info_text, at_sender=False)
+            await steam_searcher.finish(message=info_text)
