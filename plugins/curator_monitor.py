@@ -7,6 +7,8 @@ Steam 鉴赏家待处理副本监控 - NoneBot2 插件
 用法：
   pending              — 手动触发检查，结果发到当前群
   pending test         — 发送测试推送
+  pending <appid>      — 查询已入库游戏详情（含创作者留言，只读）
+  pending <关键字>      — 在游戏名/创作者留言中搜索（只读）
 
 配置（.env）：
   CURATOR_COOKIE        — Steam 鉴赏家后台 Cookie（与商店页面 cookie 不同）
@@ -74,6 +76,7 @@ class PendingGame:
     name: str
     copies: int
     expiration: str
+    creator_message: str = ""
 
 
 @dataclass
@@ -221,6 +224,11 @@ def _init_db() -> None:
             conn.execute("UPDATE seen_games SET first_seen_at = '2000-01-01 00:00:00' WHERE first_seen_at IS NULL")
         except sqlite3.OperationalError:
             pass  # 列已存在
+        # 兼容旧表：补 creator_message 列
+        try:
+            conn.execute("ALTER TABLE seen_games ADD COLUMN creator_message TEXT")
+        except sqlite3.OperationalError:
+            pass  # 列已存在
         conn.execute("""
             CREATE TABLE IF NOT EXISTS meta (
                 key TEXT PRIMARY KEY,
@@ -266,11 +274,83 @@ def _mark_initialized() -> None:
 
 
 def load_seen_games() -> dict[str, dict[str, Any]]:
-    """从 SQLite 加载已见游戏。{app_id: {name, copies}}"""
+    """从 SQLite 加载已见游戏。{app_id: {name, copies, creator_message, first_seen_at, updated_at}}"""
     conn = _get_db()
     try:
-        rows = conn.execute("SELECT app_id, name, copies FROM seen_games").fetchall()
-        return {row[0]: {"name": row[1], "copies": row[2]} for row in rows}
+        rows = conn.execute(
+            "SELECT app_id, name, copies, creator_message, first_seen_at, updated_at "
+            "FROM seen_games"
+        ).fetchall()
+        return {
+            row[0]: {
+                "name": row[1],
+                "copies": row[2],
+                "creator_message": row[3] or "",
+                "first_seen_at": row[4],
+                "updated_at": row[5],
+            }
+            for row in rows
+        }
+    finally:
+        conn.close()
+
+
+def get_game_record(app_id: str) -> dict[str, Any] | None:
+    """按 appid 查询单条已入库记录（只读，不联网）。"""
+    conn = _get_db()
+    try:
+        row = conn.execute(
+            "SELECT app_id, name, copies, creator_message, first_seen_at, updated_at "
+            "FROM seen_games WHERE app_id = ?",
+            (app_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "app_id": row[0],
+            "name": row[1],
+            "copies": row[2],
+            "creator_message": row[3] or "",
+            "first_seen_at": row[4],
+            "updated_at": row[5],
+        }
+    finally:
+        conn.close()
+
+
+def _escape_like(text: str) -> str:
+    """转义 LIKE 通配符（配合 ESCAPE '\\' 使用）。"""
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def search_game_records(keyword: str, limit: int = 8) -> list[dict[str, Any]]:
+    """在游戏名和创作者留言中搜索（只读），名称命中优先。"""
+    pattern = f"%{_escape_like(keyword)}%"
+    conn = _get_db()
+    try:
+        rows = conn.execute(
+            """
+            SELECT app_id, name, copies, creator_message, first_seen_at, updated_at,
+                   CASE WHEN name LIKE ? ESCAPE '\\' THEN 0 ELSE 1 END AS name_rank
+            FROM seen_games
+            WHERE name LIKE ? ESCAPE '\\'
+               OR COALESCE(creator_message, '') LIKE ? ESCAPE '\\'
+            ORDER BY name_rank ASC, first_seen_at DESC
+            LIMIT ?
+            """,
+            (pattern, pattern, pattern, limit),
+        ).fetchall()
+        return [
+            {
+                "app_id": row[0],
+                "name": row[1],
+                "copies": row[2],
+                "creator_message": row[3] or "",
+                "first_seen_at": row[4],
+                "updated_at": row[5],
+            }
+            for row in rows
+        ]
     finally:
         conn.close()
 
@@ -306,23 +386,25 @@ def save_seen_games(
         for g in games:
             if overwrite_first_seen:
                 conn.execute("""
-                    INSERT INTO seen_games (app_id, name, copies, first_seen_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO seen_games (app_id, name, copies, creator_message, first_seen_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     ON CONFLICT(app_id) DO UPDATE SET
                         name=excluded.name,
                         copies=excluded.copies,
+                        creator_message=COALESCE(NULLIF(excluded.creator_message, ''), seen_games.creator_message),
                         updated_at=excluded.updated_at,
                         first_seen_at=excluded.first_seen_at
-                """, (g.app_id, g.name, g.copies, fs, now))
+                """, (g.app_id, g.name, g.copies, g.creator_message, fs, now))
             else:
                 conn.execute("""
-                    INSERT INTO seen_games (app_id, name, copies, first_seen_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO seen_games (app_id, name, copies, creator_message, first_seen_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     ON CONFLICT(app_id) DO UPDATE SET
                         name=excluded.name,
                         copies=excluded.copies,
+                        creator_message=COALESCE(NULLIF(excluded.creator_message, ''), seen_games.creator_message),
                         updated_at=excluded.updated_at
-                """, (g.app_id, g.name, g.copies, fs, now))
+                """, (g.app_id, g.name, g.copies, g.creator_message, fs, now))
         conn.commit()
     finally:
         conn.close()
@@ -513,8 +595,24 @@ def parse_pending_page(html: str) -> CheckResult:
                     expiration = text
                     break
 
+        creator_message = ""
+        creator_el = div.select_one(".creator_message")
+        if creator_el:
+            for node in list(creator_el.find_all(string=True)):
+                raw = str(node)
+                stripped = raw.strip()
+                if stripped != raw:
+                    if stripped:
+                        node.replace_with(stripped)
+                    else:
+                        node.extract()
+            for br in creator_el.find_all("br"):
+                br.replace_with("\n")
+            creator_message = re.sub(r"\n{3,}", "\n\n", creator_el.get_text()).strip()
+
         games.append(PendingGame(
             app_id=app_id, name=name, copies=copies, expiration=expiration,
+            creator_message=creator_message,
         ))
 
     return CheckResult(total_pending=total_pending, games=games,
@@ -708,6 +806,76 @@ def format_result(result: CheckResult, curator_name: str) -> str:
     return "\n".join(lines)
 
 
+# ── 查询结果格式化（只读）──────────────────────────────────────
+_MAX_MESSAGE_LEN = 4000
+_TRUNCATE_SUFFIX = "…（内容过长已截断）"
+
+
+def _truncate(text: str, limit: int = _MAX_MESSAGE_LEN) -> str:
+    """超出长度上限时截断并追加提示。"""
+    if len(text) <= limit:
+        return text
+    return text[: limit - len(_TRUNCATE_SUFFIX)] + _TRUNCATE_SUFFIX
+
+
+def format_record_detail(rec: dict[str, Any]) -> str:
+    """格式化单条入库记录详情（含完整创作者留言）。"""
+    message = (rec.get("creator_message") or "").strip()
+    message_block = (
+        f"👤 来自创作者：\n{message}"
+        if message else "👤 来自创作者：（无记录）"
+    )
+    first_seen = rec.get("first_seen_at")
+    if not first_seen:
+        first_seen_label = "（未知）"
+    elif str(first_seen).startswith("2000-01-01"):
+        first_seen_label = "历史基线"
+    else:
+        first_seen_label = str(first_seen)
+    text = (
+        f"🎮 {rec.get('name', '未知')}（{rec.get('app_id', '')}）\n"
+        f"📦 副本：{rec.get('copies', 0)}\n"
+        f"📅 首次入库：{first_seen_label}\n"
+        f"{message_block}"
+    )
+    return _truncate(text)
+
+
+def _message_snippet(message: str, keyword: str, width: int = 80) -> str:
+    """生成单行留言摘要；命中关键字时以关键字为中心截取。"""
+    text = re.sub(r"\s+", " ", message).strip()
+    if not text:
+        return "（无创作者留言）"
+    idx = text.lower().find(keyword.lower())
+    if idx < 0:
+        snippet = text[:width]
+        return snippet + ("…" if len(text) > width else "")
+    start = max(idx - width // 2, 0)
+    end = min(start + width, len(text))
+    start = max(end - width, 0)
+    prefix = "…" if start > 0 else ""
+    suffix = "…" if end < len(text) else ""
+    return f"{prefix}{text[start:end]}{suffix}"
+
+
+def format_search_results(keyword: str, rows: list[dict[str, Any]]) -> str:
+    """格式化搜索结果（0 条 / 1 条详情 / 多条摘要列表）。"""
+    if not rows:
+        return f"❌ 未找到包含「{keyword}」的记录"
+    if len(rows) == 1:
+        return format_record_detail(rows[0])
+
+    shown = rows[:8]
+    lines = [f"🔍 包含「{keyword}」的入库记录："]
+    for rec in shown:
+        lines.append(f"  🎮 {rec.get('name', '未知')}（{rec.get('app_id', '')}）")
+        lines.append(f"    {_message_snippet(rec.get('creator_message') or '', keyword)}")
+    lines.append("💡 用 pending <appid> 查看完整内容")
+    if len(rows) > len(shown):
+        lines.append(f"… 另有 {len(rows) - len(shown)} 条未显示")
+    return _truncate("\n".join(lines))
+
+
 # ── 发送消息 ──────────────────────────────────────────────────────
 def _split_ids(raw: str) -> list[str]:
     """将逗号分隔的 QQ 号/群号字符串拆分为列表（自动去空格、忽略空项）。"""
@@ -748,6 +916,31 @@ async def handle_curator(bot, event):
     is_test = sub == "test"
     is_init = sub == "init"
     is_force = is_init and len(args) > 2 and args[2].lower() == "force"
+    arg_text = raw_msg.strip().split(None, 1)[1].strip() if len(args) > 1 else ""
+    is_query = bool(arg_text) and sub not in ("init", "test")
+
+    # 只读查询：不联网、不写库，未配置 cookie 也可用
+    if is_query:
+        try:
+            if arg_text.isdigit():
+                rec = get_game_record(arg_text)
+                if rec is None:
+                    if cleanup: await cleanup()
+                    await curator_cmd.finish(
+                        f"❌ 未找到 appid {arg_text} 的入库记录"
+                        "（只查询已入库数据，不会联网抓取，可先发送 pending 抓取一次）",
+                    )
+                if cleanup: await cleanup()
+                await curator_cmd.finish(format_record_detail(rec))
+            rows = search_game_records(arg_text)
+            if cleanup: await cleanup()
+            await curator_cmd.finish(format_search_results(arg_text, rows))
+        except FinishedException:
+            raise
+        except Exception as e:
+            logger.exception("查询异常")
+            if cleanup: await cleanup()
+            await curator_cmd.finish(f"❌ 查询异常: {e}")
 
     if not is_configured():
         if cleanup: await cleanup()

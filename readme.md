@@ -238,11 +238,17 @@ CURATOR_ID=你的鉴赏家ID
 | 命令 | 说明 |
 |------|------|
 | `pending` | 手动触发一次检查，结果发送到当前群。有今日新到游戏时额外输出 `📋 今日新到游戏` 列表 |
+| `pending <appid>` | 查询已入库的待处理游戏详情（含“来自创作者”留言）；只读，不联网、不写库 |
+| `pending <关键字>` | 在游戏名称和“来自创作者”留言中搜索已入库记录；多条命中时提示用 `pending <appid>` 查看全文 |
 | `pending init` | 建立历史基线：抓取当前所有待处理游戏并标记为历史入库（不推送、不计入「今日新到」），用于首次接入监控时防止积压库存刷屏 |
 | `pending init force` | 数据库已有记录时强制重建基线（不给 `force` 会被拦截，避免把真正的新到游戏误设为历史） |
 | `pending test` | 发送测试推送（QQ 消息 + ntfy 如有配置） |
 
 > **自动首跑**：若数据库从未初始化过（SQLite `meta` 表无 `initialized` 标记），普通 `pending` 与定时检查也会自动走上述「静默基线」路径，不会刷屏；已有历史数据的旧库视为已初始化，不受影响。基线初始化时是否把库存同步进 remain 台账，沿用现有 `CURATOR_SYNC_REMAIN` 开关。
+
+> **创作者留言**：保存在 SQLite `seen_games.creator_message`；随后续检查自动补全，空内容不会覆盖已有留言。
+>
+> `pending <appid>` / `pending <关键字>` 为只读查询，不联网、不写库。
 
 **消息格式：**
 
@@ -405,6 +411,7 @@ Steam 非官方 API `store.steampowered.com/api/appdetails` 的参数说明、�
 | `pub <publisher>` | `steamPublishers` | 查询发行商页面截图（`?flavor=all_upcoming`，即将推出列表） |
 | `find <关键字>` | `搜索steam游戏` | 交互式搜索 Steam 游戏，搜索结果选编号后显示详情（名称、类型、热门标签、语言、日期、发行商、价格、截图） |
 | `pending` | — | 鉴赏家副本监控，手动触发检查；首次运行自动静默建立基线 |
+| `pending <appid/关键字>` | — | 查询/搜索已入库的鉴赏家待处理记录（含创作者留言，只读） |
 | `bind` | — | 将 Steam ID 绑定到 QQ 账号 |
 | `get <游戏ID> [用户ID]` | — | 登记游戏领取记录（可代他人登记） |
 | `remain <游戏ID> [份数]` | — | 剩余份数登记 / 查询当前领取情况 |
