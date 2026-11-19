@@ -48,13 +48,13 @@ async def send_with_fallback(result):
         await send(result, matcher=steamGoods)
         return
     except SendError as e:
-        print(f"[steamFinderAuto] 发送失败，重试一次: {e}")
+        print(f"[idAuto] 发送失败，重试一次: {e}")
         await asyncio.sleep(2)
         try:
             await send(result, matcher=steamGoods)
             return
         except SendError as e2:
-            print(f"[steamFinderAuto] 重试仍失败，降级为纯文本: {e2}")
+            print(f"[idAuto] 重试仍失败，降级为纯文本: {e2}")
 
     # 降级：剔除图片段，仅发送文本
     plain = plaintext_of(result).strip()

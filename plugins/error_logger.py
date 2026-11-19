@@ -192,7 +192,7 @@ def log_error(source: str, message: str, exc_info: bool = True) -> None:
     适用于网络超时、API 拒绝等可恢复的异常场景。
 
     Args:
-        source: 错误来源，如 ``"steamFinder.take_screenshot"``。
+        source: 错误来源，如 ``"id.take_screenshot"``。
         message: 错误描述文字。
         exc_info: 是否包含异常堆栈（默认 True）。
 

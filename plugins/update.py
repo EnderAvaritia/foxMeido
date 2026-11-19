@@ -1,5 +1,5 @@
 """
-auto_pull.py - 自动拉取仓库更新插件
+update.py - 自动拉取仓库更新插件
 
 定时或手动执行 git pull，检测到新提交后自动重启机器人以加载新代码。
 
@@ -699,7 +699,7 @@ if _cfg["enabled"]:
             "cron",
             hour=_hour,
             minute=_minute,
-            id="auto_pull_cron",
+            id="update_cron",
             replace_existing=True,
             misfire_grace_time=300,
         )
@@ -711,7 +711,7 @@ if _cfg["enabled"]:
             scheduledPull,
             "interval",
             minutes=_cfg["interval"],
-            id="auto_pull_interval",
+            id="update_interval",
             replace_existing=True,
             misfire_grace_time=120,
         )

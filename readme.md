@@ -92,7 +92,7 @@ Milky 适配器要求 **Python >= 3.10**、**NoneBot >= 2.4.2**；本项目已�
 
 登记游戏领取记录的后端数据库，两种后端可选：**SQLite**（默认）或 **NocoDB**。
 
-> 不用数据库功能？可删除 `plugins/db/` 目录，但需**同时**删除依赖它的命令插件（bind / get / remain / report / unfinished / unreported / queryWishlist / probe / calendar / wish；curator_monitor 需关闭其中的数据库同步）。Steam 查询、`price` 比价、截图、代理等功能不需要数据库——配置读取已解耦到 `plugins/config.py`，删除后不受影响。
+> 不用数据库功能？可删除 `plugins/db/` 目录，但需**同时**删除依赖它的命令插件（bind / get / remain / report / unfinished / unreported / queryWishlist / probe / calendar / wish；pending 需关闭其中的数据库同步）。Steam 查询、`price` 比价、截图、代理等功能不需要数据库——配置读取已解耦到 `plugins/config.py`，删除后不受影响。
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
@@ -463,18 +463,18 @@ foxMeido/
     ├── config.py           # 全局配置中心（读取 .env：DB/Steam/代理/PRICE_REGIONS）
     ├── protocol/           # 协议中立层（消息 / 身份 / 表情 / 主动推送）
     ├── steam_utils.py      # Steam 通用工具
-    ├── curator_monitor.py# Steam 鉴赏家副本监控
+    ├── pending.py        # Steam 鉴赏家副本监控（pending 指令）
     ├── finder.py         # 通用页面截图
     ├── help.py           # 帮助命令
     ├── ping.py           # 心跳测试
-    ├── steamFinder.py    # Steam 游戏详情查询
-    ├── steamFinderAuto.py# Steam 链接自动触发查询
-    ├── steamPublisherFinder.py    # 发行商页面查询
-    ├── steamPublisherFinderAuto.py# 发行商链接自动触发
-    ├── steamSearcher.py  # Steam 游戏搜索
+    ├── id.py             # Steam 游戏详情查询（id 指令）
+    ├── idAuto.py         # Steam 链接自动触发查询
+    ├── pub.py            # 发行商页面查询（pub 指令）
+    ├── pubAuto.py        # 发行商链接自动触发
+    ├── find.py           # Steam 游戏搜索（find 指令）
     ├── price.py          # 多区域价格比价命令
     ├── playwright_utils.py # 共享 Playwright 工具
-    ├── auto_pull.py        # 自动拉取仓库更新（定时 + 手动命令）
+    ├── update.py           # 自动拉取仓库更新（update / pull 指令）
     ├── message_reaction.py # 表情回复模块（核心函数 + 自动钩子）
     ├── error_logger.py     # 错误日志模块（全模块共用）
     ├── bind.py           # 登记 Steam ID（绑定账号）

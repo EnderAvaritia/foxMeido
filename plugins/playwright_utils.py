@@ -135,7 +135,7 @@ async def _save_failure_screenshot(page, label: str) -> str | None:
 
     Args:
         page: Playwright page 实例（仍在打开状态）。
-        label: 标识来源，如 ``"take_app_screenshot"`` / ``"steamFinder"``。
+        label: 标识来源，如 ``"take_app_screenshot"`` / ``"id"``。
 
     Returns:
         str | None: 保存的文件路径，失败则 None。

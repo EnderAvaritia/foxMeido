@@ -28,7 +28,7 @@ noco 后端配置（仅 DB_BACKEND=noco 时生效）：
   STEAM_COOKIE         - Steam 登录 Cookie（wish 用）
   STEAM_CC             - Steam 国家/地区码（steam_utils 用）
   PRICE_REGIONS        - price 命令查询的区域列表（逗号/空格分隔，可多个）
-  CURATOR_ID           - Steam 鉴赏家 ID（curator_monitor / unreported 用）
+  CURATOR_ID           - Steam 鉴赏家 ID（pending / unreported 用）
 """
 
 from __future__ import annotations
